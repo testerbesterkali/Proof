@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2 } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2, Search, Bell } from 'lucide-react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -25,6 +25,20 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
     ];
 
     const currentPath = location.pathname;
+
+    // Derive page title from route
+    const getPageTitle = () => {
+        if (currentPath === '/dashboard' || currentPath === '/') return 'Dashboard';
+        if (currentPath === '/challenges') return 'Challenges';
+        if (currentPath.startsWith('/challenge/')) return 'Challenge';
+        if (currentPath === '/applications') return 'Applications';
+        if (currentPath === '/analytics') return 'Analytics';
+        if (currentPath === '/messages') return 'Messages';
+        if (currentPath === '/upload') return 'Record Proof';
+        if (currentPath === '/settings/accounts') return 'Connected Accounts';
+        if (currentPath.startsWith('/employer')) return 'Employer';
+        return 'Proof';
+    };
 
     return (
         <div className="w-full h-screen flex text-[#1C1C1E] overflow-hidden relative bg-[#F8F9FB]">
@@ -123,31 +137,30 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex bg-white/40 backdrop-blur-xl px-2 py-2 rounded-full gap-1 shadow-glass border border-white/40"
+                        className="flex items-center"
                     >
-                        {['Overview', 'Challenges', 'Messages', 'Community'].map((item) => {
-                            const path = item === 'Challenges' ? '/challenges' : (item === 'Messages' ? '/messages' : (item === 'Community' ? '/community' : '/'));
-                            const isActive = currentPath === path;
-                            return (
-                                <Link
-                                    key={item}
-                                    to={path}
-                                    className={`px-6 py-2.5 rounded-full text-xs font-bold transition-all ${isActive
-                                        ? 'bg-[#1C1C1E] text-white shadow-lg'
-                                        : 'text-[#1C1C1E]/50 hover:text-[#1C1C1E] hover:bg-white/50'
-                                        }`}
-                                >
-                                    {item}
-                                </Link>
-                            );
-                        })}
+                        <div className="flex items-center gap-2 bg-white/40 backdrop-blur-xl px-4 py-2.5 rounded-full border border-white/40 shadow-glass w-64">
+                            <Search size={14} className="text-[#1C1C1E]/30" />
+                            <input
+                                type="text"
+                                placeholder="Search... ⌘K"
+                                className="bg-transparent text-xs font-medium placeholder-[#1C1C1E]/30 focus:outline-none w-full text-[#1C1C1E]"
+                            />
+                        </div>
                     </motion.div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <button className="w-10 h-10 rounded-full bg-white/40 backdrop-blur-xl border border-white/40 flex items-center justify-center relative hover:bg-white/60 transition-colors shadow-sm">
+                            <Bell size={16} strokeWidth={2.5} className="text-[#1C1C1E]/50" />
+                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-proof-accent rounded-full text-[8px] font-black text-white flex items-center justify-center">3</span>
+                        </button>
+                        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:scale-105 transition-transform">
+                            <img src="https://i.pravatar.cc/100?img=33" alt="Profile" className="w-full h-full object-cover" />
+                        </div>
                         {showFindChallenge && (
                             <Link
                                 to="/challenges"
-                                className="bg-proof-accent text-white px-8 py-3.5 rounded-full text-xs font-black shadow-lg hover:shadow-xl hover:translate-y-[-2px] active:translate-y-[0px] transition-all flex items-center gap-2"
+                                className="bg-proof-accent text-white px-8 py-3.5 rounded-full text-xs font-black shadow-lg hover:shadow-xl hover:translate-y-[-2px] active:translate-y-[0px] transition-all flex items-center gap-2 ml-1"
                             >
                                 FIND A CHALLENGE <ArrowRight size={14} strokeWidth={3} />
                             </Link>
