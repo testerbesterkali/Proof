@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Briefcase, Users, MessageSquare, Plus, ArrowUpRight, Search, Bell, Copy, CheckCircle2, ChevronRight, Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, MessageSquare, Plus, ArrowUpRight, Search, Bell, Copy, CheckCircle2, ChevronRight, Loader2, Link as LinkIcon, AlertCircle, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -18,7 +18,7 @@ interface ChallengeData {
 }
 
 export function EmployerChallenges() {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const [loading, setLoading] = React.useState(true);
     const [challenges, setChallenges] = React.useState<ChallengeData[]>([]);
     const [copiedId, setCopiedId] = React.useState<string | null>(null);
@@ -107,6 +107,12 @@ export function EmployerChallenges() {
                         <MessageSquare size={18} /> Messages
                     </Link>
                 </nav>
+
+                <div className="mt-auto">
+                    <button onClick={() => signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-500 hover:bg-red-50 rounded-2xl font-bold text-sm transition-all shadow-sm bg-white border border-red-100">
+                        <LogOut size={18} /> Sign Out
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN CONTENT */}
@@ -161,8 +167,8 @@ export function EmployerChallenges() {
                             >
                                 <div className="flex items-center gap-8">
                                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm text-2xl font-black ${challenge.status === 'ACTIVE'
-                                            ? 'bg-blue-50 text-blue-500'
-                                            : 'bg-[#E4E5E7]/50 text-[#1C1C1E]/30'
+                                        ? 'bg-blue-50 text-blue-500'
+                                        : 'bg-[#E4E5E7]/50 text-[#1C1C1E]/30'
                                         }`}>
                                         {challenge.title.charAt(0)}
                                     </div>

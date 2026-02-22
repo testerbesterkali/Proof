@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Briefcase, Users, MessageSquare, Plus, ArrowUpRight, Search, Bell, Settings, ChevronDown, BarChart3, Clock, CheckCircle2, Loader2, Building2 } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, MessageSquare, Plus, ArrowUpRight, Search, Bell, Settings, ChevronDown, BarChart3, Clock, CheckCircle2, Loader2, Building2, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -23,7 +23,7 @@ interface ChallengeData {
 }
 
 export function EmployerDashboard() {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const [loading, setLoading] = React.useState(true);
     const [profile, setProfile] = React.useState<EmployerProfileData | null>(null);
     const [challenges, setChallenges] = React.useState<ChallengeData[]>([]);
@@ -121,9 +121,12 @@ export function EmployerDashboard() {
                             {profile?.industry || 'Employer'}
                         </p>
                         <p className="font-bold text-xs mb-4">{profile?.companySize ? `${profile.companySize} employees` : 'Set up your profile'}</p>
-                        <Link to="/settings/accounts" className="w-full py-2 bg-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:shadow-md transition-all block text-center">
+                        <Link to="/settings/accounts" className="w-full py-2 bg-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:shadow-md transition-all block text-center mb-2">
                             Settings
                         </Link>
+                        <button onClick={() => signOut()} className="w-full py-2 bg-red-50 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:shadow-md hover:bg-red-100 transition-all block text-center">
+                            Sign Out
+                        </button>
                     </div>
                 </div>
             </aside>

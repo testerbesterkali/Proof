@@ -2,21 +2,21 @@ import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { Search, Send, Phone, Video, MoreVertical, Smile, Paperclip, ShieldCheck, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import io from 'socket.io-client';
-import type { Socket } from 'socket.io-client';
 import { Layout } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface Message {
     id: string;
     senderId: string;
     receiverId: string;
     content: string;
+    isRead: boolean;
     createdAt: string;
 }
 
 interface Conversation {
-    id: string;
-    email: string;
+    id: string; // This is the other user's ID
     name: string;
     role: string;
     avatar: string;
@@ -25,96 +25,167 @@ interface Conversation {
 }
 
 export function Messages() {
+    const { user } = useAuth();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
-    const [socket, setSocket] = useState<Socket | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const currentUserId = "me-user-id";
-
     useEffect(() => {
-        const newSocket = io('http://localhost:3000', {
-            withCredentials: true
-        });
-        setSocket(newSocket);
+        if (!user) return;
+        loadConversations();
+    }, [user]);
 
-        setConversations([
-            {
-                id: 'user-1',
-                email: 'sarah.design@gmail.com',
-                name: 'Sarah Chen',
-                role: 'CANDIDATE',
-                avatar: 'https://i.pravatar.cc/150?img=1',
-                status: 'online',
-                lastMessage: 'The design files are ready for review.'
-            },
-            {
-                id: 'user-2',
-                email: 'alex.backend@proof.com',
-                name: 'Alex Rivera',
-                role: 'CANDIDATE',
-                avatar: 'https://i.pravatar.cc/150?img=2',
-                status: 'offline',
-                lastMessage: 'I have optimized the database queries.'
-            },
-            {
-                id: 'user-3',
-                email: 'hiring.manager@stripe.com',
-                name: 'James Wilson',
-                role: 'EMPLOYER',
-                avatar: 'https://i.pravatar.cc/150?img=3',
-                status: 'online',
-                lastMessage: 'We would like to invite you for an interview.'
+    const loadConversations = async () => {
+        if (!user) return;
+        try {
+            // 1. Fetch all messages involving the current user
+            const { data: messageData, error: msgError } = await supabase
+                .from('Message')
+                .select('*')
+                .or(`senderId.eq.${user.id},receiverId.eq.${user.id}`)
+                .order('createdAt', { ascending: true });
+
+            if (msgError) throw msgError;
+
+            const allMessages = messageData as Message[];
+            if (!allMessages.length) {
+                // If no actual messages, provide a mock conversation to start with so the UI isn't empty,
+                // but wire it to a specific mock employer ID so it works.
+                setConversations([
+                    {
+                        id: 'mock-employer-123',
+                        name: 'Stripe Hiring Team',
+                        role: 'EMPLOYER',
+                        avatar: 'https://i.pravatar.cc/150?u=stripe',
+                        status: 'online',
+                        lastMessage: 'Welcome to Proof messaging!'
+                    }
+                ]);
+                return;
             }
-        ]);
 
-        return () => {
-            newSocket.disconnect();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (selectedConvo && socket) {
-            const roomId = [currentUserId, selectedConvo.id].sort().join('-');
-            socket.emit('join_room', roomId);
-
-            setMessages([
-                { id: '1', senderId: selectedConvo.id, receiverId: currentUserId, content: 'Hey, I just updated the proof for the matching engine challenge!', createdAt: new Date(Date.now() - 3600000).toISOString() },
-                { id: '2', senderId: currentUserId, receiverId: selectedConvo.id, content: 'That’s awesome! I’ll dive into the review in a bit.', createdAt: new Date(Date.now() - 1800000).toISOString() }
-            ]);
-
-            socket.on('receive_message', (msg: Message) => {
-                setMessages(prev => [...prev, msg]);
+            // 2. Identify unique partner IDs and last messages
+            const partnerIds = new Set<string>();
+            const lastMessageMap = new Map<string, string>();
+            allMessages.forEach(m => {
+                const partnerId = m.senderId === user.id ? m.receiverId : m.senderId;
+                partnerIds.add(partnerId);
+                // Since messages are sorted ascending, the last one processed is the latest
+                lastMessageMap.set(partnerId, m.content);
             });
 
-            return () => {
-                socket.off('receive_message');
-            };
+            // 3. Fetch Employer Profiles to get names
+            const { data: employers, error: empError } = await supabase
+                .from('EmployerProfile')
+                .select('userId, companyName')
+                .in('userId', Array.from(partnerIds));
+
+            if (empError) throw empError;
+
+            const empMap = new Map(employers?.map(e => [e.userId, e.companyName]));
+
+            const loadedConvos: Conversation[] = Array.from(partnerIds).map(id => ({
+                id,
+                name: empMap.get(id) || `Employer #${id.substring(0, 6)}`,
+                role: 'EMPLOYER',
+                avatar: `https://i.pravatar.cc/150?u=${id}`,
+                status: 'online', // Mock online status
+                lastMessage: lastMessageMap.get(id) || ''
+            }));
+
+            setConversations(loadedConvos);
+
+            // Auto-select the first conversation if none is selected
+            if (loadedConvos.length > 0 && !selectedConvo) {
+                setSelectedConvo(loadedConvos[0]);
+            }
+
+        } catch (err) {
+            console.error('Error loading conversations:', err);
         }
-    }, [selectedConvo, socket]);
+    };
+
+    // Load messages for selected conversation
+    useEffect(() => {
+        if (!user || !selectedConvo) return;
+
+        const loadSelectedMessages = async () => {
+            const { data } = await supabase
+                .from('Message')
+                .select('*')
+                .or(`and(senderId.eq.${user.id},receiverId.eq.${selectedConvo.id}),and(senderId.eq.${selectedConvo.id},receiverId.eq.${user.id})`)
+                .order('createdAt', { ascending: true });
+
+            if (data) setMessages(data as Message[]);
+        };
+
+        loadSelectedMessages();
+
+        // Subscribe to real-time incoming messages
+        const channel = supabase.channel(`messages:${user.id}:${selectedConvo.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'Message',
+                    // Filter messages where we are either sender or receiver
+                },
+                (payload) => {
+                    const newMsg = payload.new as Message;
+                    // Check if it belongs to this conversation threading
+                    if (
+                        (newMsg.senderId === user.id && newMsg.receiverId === selectedConvo.id) ||
+                        (newMsg.senderId === selectedConvo.id && newMsg.receiverId === user.id)
+                    ) {
+                        setMessages((prev) => {
+                            // Deduplicate just in case
+                            if (prev.find(m => m.id === newMsg.id)) return prev;
+                            return [...prev, newMsg];
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user, selectedConvo]);
 
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, [messages]);
 
-    const handleSendMessage = (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedConvo || !socket) return;
+        if (!newMessage.trim() || !selectedConvo || !user) return;
+
+        const content = newMessage;
+        setNewMessage(''); // optimistic clear
 
         const msgData = {
-            id: Date.now().toString(),
-            senderId: currentUserId,
+            id: crypto.randomUUID(),
+            senderId: user.id,
             receiverId: selectedConvo.id,
-            content: newMessage,
-            createdAt: new Date().toISOString(),
-            roomId: [currentUserId, selectedConvo.id].sort().join('-')
+            content,
+            isRead: false
         };
 
-        socket.emit('send_message', msgData);
-        setMessages(prev => [...prev, msgData]);
-        setNewMessage('');
+        // Optimistic UI update
+        // We add an optimistic timestamp, the real one will come from Supabase via Realtime,
+        // but since we deduct local echoes in Realtime it handles smoothly. Note: Realtime might send it back.
+        setMessages(prev => [...prev, { ...msgData, createdAt: new Date().toISOString() }]);
+
+        try {
+            const { error } = await supabase.from('Message').insert(msgData);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Failed to send message:', err);
+            // Revert optimistic update? For now simply log.
+        }
     };
 
     return (
@@ -153,7 +224,6 @@ export function Messages() {
                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                                     <div className="flex justify-between items-start mb-1">
                                         <h4 className="font-black text-sm tracking-tight">{convo.name}</h4>
-                                        <span className="text-[10px] font-black text-[#1C1C1E]/30 uppercase">4h</span>
                                     </div>
                                     <p className={`text-xs truncate font-bold ${selectedConvo?.id === convo.id ? 'text-proof-accent' : 'text-[#1C1C1E]/50'}`}>
                                         {convo.lastMessage}
@@ -193,7 +263,7 @@ export function Messages() {
                             <div className="flex-1 overflow-y-auto px-8 py-8 flex flex-col gap-6">
                                 <div className="flex-1" />
                                 {messages.map((msg, i) => {
-                                    const isMe = msg.senderId === currentUserId;
+                                    const isMe = msg.senderId === user?.id;
                                     return (
                                         <motion.div
                                             key={msg.id}
@@ -207,7 +277,7 @@ export function Messages() {
                                                 }`}>
                                                 {msg.content}
                                                 <div className={`text-[9px] font-black uppercase mt-3 tracking-widest opacity-40`}>
-                                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    {msg.createdAt && new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </div>
                                             </div>
                                         </motion.div>

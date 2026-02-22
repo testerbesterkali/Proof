@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2, Search, Bell } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2, Search, Bell, LogOut } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -10,6 +11,7 @@ interface LayoutProps {
 
 export function Layout({ children, showFindChallenge = true }: LayoutProps) {
     const location = useLocation();
+    const { signOut } = useAuth();
 
     const sidebarItems = [
         { icon: LayoutDashboard, path: '/dashboard', label: 'Dashboard' },
@@ -128,6 +130,18 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
                         );
                     })}
                 </nav>
+
+                <div className="mt-auto mb-4">
+                    <button
+                        onClick={() => signOut()}
+                        className="w-12 h-12 flex items-center justify-center rounded-2xl transition-all relative group text-[#1C1C1E]/40 hover:text-red-500 hover:bg-red-50"
+                    >
+                        <LogOut size={20} strokeWidth={2.5} />
+                        <div className="absolute left-16 bg-[#1C1C1E] text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-bold uppercase tracking-widest">
+                            Sign Out
+                        </div>
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN CONTENT AREA */}

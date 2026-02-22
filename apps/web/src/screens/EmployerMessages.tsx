@@ -1,19 +1,21 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCircle2, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface Message {
     id: string;
     senderId: string;
     receiverId: string;
     content: string;
+    isRead: boolean;
     createdAt: string;
 }
 
 interface Conversation {
-    id: string;
+    id: string; // The other user's ID
     name: string;
     role: string;
     avatar: string;
@@ -22,48 +24,162 @@ interface Conversation {
 }
 
 export function EmployerMessages() {
-    const { user } = useAuth();
-    // For now, mock conversations since chat backend isn't fully wired for employers yet.
-    const [conversations] = React.useState<Conversation[]>([
-        {
-            id: 'c-1',
-            name: 'Sarah Chen',
-            role: 'Product Designer',
-            avatar: 'https://i.pravatar.cc/150?img=1',
-            status: 'online',
-            lastMessage: 'The design files are ready for review.'
-        },
-        {
-            id: 'c-2',
-            name: 'Alex Rivera',
-            role: 'Backend Engineer',
-            avatar: 'https://i.pravatar.cc/150?img=2',
-            status: 'offline',
-            lastMessage: 'I have optimized the database queries.'
-        }
-    ]);
-    const [selectedConvo, setSelectedConvo] = React.useState<Conversation | null>(conversations[0]);
-    const [messages, setMessages] = React.useState<Message[]>([
-        { id: '1', senderId: 'c-1', receiverId: 'me', content: 'Hi! I just submitted my design challenge.', createdAt: new Date(Date.now() - 3600000).toISOString() },
-        { id: '2', senderId: 'me', receiverId: 'c-1', content: 'Thanks Sarah, I will review it shortly. It looks great at first glance!', createdAt: new Date(Date.now() - 3000000).toISOString() },
-        { id: '3', senderId: 'c-1', receiverId: 'me', content: 'The design files are ready for review.', createdAt: new Date(Date.now() - 1000000).toISOString() }
-    ]);
+    const { user, signOut } = useAuth();
+    const [conversations, setConversations] = React.useState<Conversation[]>([]);
+    const [selectedConvo, setSelectedConvo] = React.useState<Conversation | null>(null);
+    const [messages, setMessages] = React.useState<Message[]>([]);
     const [newMessage, setNewMessage] = React.useState('');
+    const scrollRef = React.useRef<HTMLDivElement>(null);
 
-    const handleSendMessage = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !selectedConvo) return;
+    React.useEffect(() => {
+        if (!user) return;
+        loadConversations();
+    }, [user]);
 
-        const msg: Message = {
-            id: Date.now().toString(),
-            senderId: 'me',
-            receiverId: selectedConvo.id,
-            content: newMessage,
-            createdAt: new Date().toISOString()
+    const loadConversations = async () => {
+        if (!user) return;
+        try {
+            // 1. Fetch all messages involving the current employer
+            const { data: messageData, error: msgError } = await supabase
+                .from('Message')
+                .select('*')
+                .or(`senderId.eq.${user.id},receiverId.eq.${user.id}`)
+                .order('createdAt', { ascending: true });
+
+            if (msgError) throw msgError;
+
+            const allMessages = messageData as Message[];
+            if (!allMessages.length) {
+                // Mock conversation if none exist so the UI isn't completely empty during demo testing
+                setConversations([
+                    {
+                        id: 'mock-candidate-123',
+                        name: 'Candidate #A1B2C3',
+                        role: 'CANDIDATE',
+                        avatar: 'https://i.pravatar.cc/150?u=candidate',
+                        status: 'online',
+                        lastMessage: 'Waiting for a challenge...'
+                    }
+                ]);
+                return;
+            }
+
+            // 2. Identify unique partner IDs and last messages
+            const partnerIds = new Set<string>();
+            const lastMessageMap = new Map<string, string>();
+            allMessages.forEach(m => {
+                const partnerId = m.senderId === user.id ? m.receiverId : m.senderId;
+                partnerIds.add(partnerId);
+                // Since messages are sorted ascending, the last one processed is the latest
+                lastMessageMap.set(partnerId, m.content);
+            });
+
+            // 3. Fetch Candidate Profiles for these userIds to get their profile ID as a pseudo-name
+            const { data: candidates, error: candError } = await supabase
+                .from('CandidateProfile')
+                .select('id, userId')
+                .in('userId', Array.from(partnerIds));
+
+            if (candError) throw candError;
+
+            const candMap = new Map();
+            candidates?.forEach(c => {
+                candMap.set(c.userId, `Candidate #${c.id.substring(0, 6)}`);
+            });
+
+            const loadedConvos: Conversation[] = Array.from(partnerIds).map(id => ({
+                id,
+                name: candMap.get(id) || `Candidate #${id.substring(0, 6)}`,
+                role: 'CANDIDATE',
+                avatar: `https://i.pravatar.cc/150?u=${id}`,
+                status: 'online',
+                lastMessage: lastMessageMap.get(id) || ''
+            }));
+
+            setConversations(loadedConvos);
+
+            if (loadedConvos.length > 0 && !selectedConvo) {
+                setSelectedConvo(loadedConvos[0]);
+            }
+
+        } catch (err) {
+            console.error('Error loading conversations:', err);
+        }
+    };
+
+    // Load messages for selected conversation
+    React.useEffect(() => {
+        if (!user || !selectedConvo) return;
+
+        const loadSelectedMessages = async () => {
+            const { data } = await supabase
+                .from('Message')
+                .select('*')
+                .or(`and(senderId.eq.${user.id},receiverId.eq.${selectedConvo.id}),and(senderId.eq.${selectedConvo.id},receiverId.eq.${user.id})`)
+                .order('createdAt', { ascending: true });
+
+            if (data) setMessages(data as Message[]);
         };
 
-        setMessages([...messages, msg]);
+        loadSelectedMessages();
+
+        // Subscribe to real-time incoming messages
+        const channel = supabase.channel(`messages:${user.id}:${selectedConvo.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'Message',
+                },
+                (payload) => {
+                    const newMsg = payload.new as Message;
+                    if (
+                        (newMsg.senderId === user.id && newMsg.receiverId === selectedConvo.id) ||
+                        (newMsg.senderId === selectedConvo.id && newMsg.receiverId === user.id)
+                    ) {
+                        setMessages((prev) => {
+                            if (prev.find(m => m.id === newMsg.id)) return prev;
+                            return [...prev, newMsg];
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user, selectedConvo]);
+
+    React.useEffect(() => {
+        scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, [messages]);
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !selectedConvo || !user) return;
+
+        const content = newMessage;
         setNewMessage('');
+
+        const msgData = {
+            id: crypto.randomUUID(),
+            senderId: user.id,
+            receiverId: selectedConvo.id,
+            content,
+            isRead: false
+        };
+
+        // Optimistic UI update
+        setMessages(prev => [...prev, { ...msgData, createdAt: new Date().toISOString() }]);
+
+        try {
+            const { error } = await supabase.from('Message').insert(msgData);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Failed to send message:', err);
+        }
     };
 
     return (
@@ -89,6 +205,12 @@ export function EmployerMessages() {
                         <MessageSquare size={18} /> Messages
                     </Link>
                 </nav>
+
+                <div className="mt-auto">
+                    <button onClick={() => signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-500 hover:bg-red-50 rounded-2xl font-bold text-sm transition-all shadow-sm bg-white border border-red-100">
+                        <LogOut size={18} /> Sign Out
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN CONTENT */}
@@ -115,8 +237,8 @@ export function EmployerMessages() {
                                     key={convo.id}
                                     onClick={() => setSelectedConvo(convo)}
                                     className={`w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-left ${selectedConvo?.id === convo.id
-                                            ? 'bg-white shadow-soft border border-white scale-[1.02]'
-                                            : 'hover:bg-white/60 border border-transparent hover:border-white'
+                                        ? 'bg-white shadow-soft border border-white scale-[1.02]'
+                                        : 'hover:bg-white/60 border border-transparent hover:border-white'
                                         }`}
                                 >
                                     <div className="relative">
@@ -125,8 +247,10 @@ export function EmployerMessages() {
                                             }`} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-sm truncate">{convo.name}</h4>
-                                        <p className="text-xs text-[#1C1C1E]/40 font-medium truncate mt-0.5">{convo.lastMessage}</p>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="font-bold text-sm truncate">{convo.name}</h4>
+                                        </div>
+                                        <p className={`text-xs truncate font-medium mt-0.5 ${selectedConvo?.id === convo.id ? 'text-[#1C1C1E]' : 'text-[#1C1C1E]/40'}`}>{convo.lastMessage}</p>
                                     </div>
                                 </button>
                             ))}
@@ -154,8 +278,9 @@ export function EmployerMessages() {
 
                             {/* Messages */}
                             <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[#F8F9FB]/30">
+                                <div className="flex-1" />
                                 {messages.map((msg, idx) => {
-                                    const isMe = msg.senderId === 'me';
+                                    const isMe = msg.senderId === user?.id;
                                     return (
                                         <motion.div
                                             key={msg.id}
@@ -165,17 +290,18 @@ export function EmployerMessages() {
                                             className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                                         >
                                             <div className={`max-w-[70%] p-5 rounded-3xl ${isMe
-                                                    ? 'bg-[#1C1C1E] text-white rounded-tr-sm'
-                                                    : 'bg-white border border-[#1C1C1E]/5 text-[#1C1C1E] rounded-tl-sm shadow-sm'
+                                                ? 'bg-[#1C1C1E] text-white rounded-tr-sm'
+                                                : 'bg-white border border-[#1C1C1E]/5 text-[#1C1C1E] rounded-tl-sm shadow-sm'
                                                 }`}>
                                                 <p className="font-medium text-[15px] leading-relaxed">{msg.content}</p>
                                                 <span className={`text-[10px] font-bold mt-2 block ${isMe ? 'text-white/40' : 'text-[#1C1C1E]/30'}`}>
-                                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    {msg.createdAt && new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </div>
                                         </motion.div>
                                     );
                                 })}
+                                <div ref={scrollRef} />
                             </div>
 
                             {/* Input Area */}

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, ChevronRight, Loader2, CheckCircle2, Clock, XCircle, FileText } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, ChevronRight, Loader2, CheckCircle2, Clock, XCircle, FileText, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -17,7 +17,7 @@ interface SubmissionData {
 }
 
 export function EmployerSubmissions() {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const [loading, setLoading] = React.useState(true);
     const [submissions, setSubmissions] = React.useState<SubmissionData[]>([]);
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -130,6 +130,12 @@ export function EmployerSubmissions() {
                         <MessageSquare size={18} /> Messages
                     </Link>
                 </nav>
+
+                <div className="mt-auto">
+                    <button onClick={() => signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-500 hover:bg-red-50 rounded-2xl font-bold text-sm transition-all shadow-sm bg-white border border-red-100">
+                        <LogOut size={18} /> Sign Out
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN CONTENT */}
