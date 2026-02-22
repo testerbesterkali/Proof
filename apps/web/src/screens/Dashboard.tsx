@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Search, Mail, Briefcase, Inbox, Users, ArrowRight, ArrowUpRight, ChevronDown, Check, Filter, Zap } from 'lucide-react';
+import { Search, Mail, Briefcase, Inbox, Users, ArrowRight, ArrowUpRight, ChevronDown, Check, Filter, Zap, ShieldCheck, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layout } from '../components/Layout';
 
@@ -67,116 +67,104 @@ export function Dashboard() {
                         transition={{ delay: 0.4 }}
                         className="flex-1 flex justify-end relative mt-16 lg:mt-0"
                     >
-                        {/* THE ARC SVG GRAPH */}
-                        <div className="relative w-full max-w-[600px] h-[340px]">
-                            <svg viewBox="0 0 500 250" className="w-full h-full overflow-visible">
-                                <defs>
-                                    <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.2" />
-                                        <stop offset="60%" stopColor="#FF9B8A" />
-                                        <stop offset="100%" stopColor="#FF6B52" />
-                                    </linearGradient>
-                                    <pattern id="diagonalHatch" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-                                        <line x1="0" y1="0" x2="0" y2="8" stroke="#000000" strokeOpacity="0.05" strokeWidth="1" />
-                                    </pattern>
-                                    <filter id="glow">
-                                        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                                        <feMerge>
-                                            <feMergeNode in="coloredBlur" />
-                                            <feMergeNode in="SourceGraphic" />
-                                        </feMerge>
-                                    </filter>
-                                </defs>
-
-                                <motion.path
-                                    initial={{ pathLength: 0, opacity: 0 }}
-                                    animate={{ pathLength: 1, opacity: 1 }}
-                                    transition={{ duration: 1.5, ease: "easeInOut" }}
-                                    d="M 50 220 A 170 170 0 0 1 148 81 L 180 126 A 115 115 0 0 0 115 220 Z"
-                                    fill="url(#diagonalHatch)"
-                                />
-
-                                <motion.path
-                                    initial={{ pathLength: 0 }}
-                                    animate={{ pathLength: 1 }}
-                                    transition={{ duration: 2, ease: "easeOut", delay: 0.5 }}
-                                    d="M 148 81 A 170 170 0 0 1 390 220 L 325 220 A 115 115 0 0 0 180 126 Z"
-                                    fill="url(#arcGradient)"
-                                    filter="url(#glow)"
-                                />
-
-                                <path d="M 30 220 L 410 220" fill="none" stroke="#1C1C1E" strokeOpacity="0.05" strokeWidth="2" strokeDasharray="8 8" />
-
-                                {[
-                                    { cx: 180, cy: 126, label: "10k+", delay: 1.2 },
-                                    { cx: 270, cy: 55, label: "60k+", delay: 1.4 },
-                                    { cx: 370, cy: 160, label: "100k+", delay: 1.6, hollow: true }
-                                ].map((dot, i) => (
-                                    <g key={i}>
-                                        <motion.circle
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            transition={{ delay: dot.delay, type: "spring" }}
-                                            cx={dot.cx} cy={dot.cy} r="6"
-                                            fill={dot.hollow ? "#FFF" : "#FF6B52"}
-                                            stroke="#FF6B52" strokeWidth={dot.hollow ? 2 : 0}
-                                        />
-                                        <motion.text
-                                            initial={{ opacity: 0, y: 5 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: dot.delay + 0.2 }}
-                                            x={dot.cx} y={dot.cy - 15} fontSize="14" fill="#1C1C1E" fontWeight="900" textAnchor="middle" fontFamily="Outfit"
-                                        >
-                                            {dot.label}
-                                        </motion.text>
-                                    </g>
-                                ))}
-
-                                <text x="220" y="245" fontSize="11" fill="#1C1C1E" opacity="0.3" fontWeight="800" textAnchor="middle" fontFamily="Outfit" className="uppercase tracking-[0.2em]">
-                                    candidate proofs evaluated
-                                </text>
-                            </svg>
-
-                            <div className="absolute right-[-20px] top-4 flex flex-col gap-4 z-20">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4 }}
+                            className="flex-1 flex flex-col items-center lg:items-end gap-6 mt-16 lg:mt-0 px-4"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-[540px]">
+                                {/* Verification Badge Card */}
                                 <motion.div
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 1.8 }}
-                                    className="bg-white/80 backdrop-blur-2xl px-6 py-5 rounded-[2rem] shadow-glass border border-white flex flex-col gap-4 min-w-[240px]"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.6 }}
+                                    className="col-span-1 md:col-span-2 bg-white/60 backdrop-blur-2xl p-6 rounded-[2.5rem] shadow-glass border border-white flex items-center justify-between"
                                 >
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-black uppercase tracking-widest text-proof-accent">TALENT FLOW</span>
-                                        <ChevronDown size={14} className="text-[#1C1C1E]/30" />
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-2xl bg-proof-accent/10 flex items-center justify-center text-proof-accent shadow-inner">
+                                            <ShieldCheck size={28} strokeWidth={2.5} />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40 mb-1">Status</h4>
+                                            <p className="text-lg font-black tracking-tight leading-none uppercase">Proof Verified</p>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col gap-3">
-                                        <div className="flex items-center justify-between text-xs font-bold">
-                                            <div className="flex items-center gap-2 text-[#1C1C1E]/60"><Briefcase size={12} /> Companies</div>
-                                            <span>2,234</span>
+                                    <div className="text-right">
+                                        <div className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1 flex items-center justify-end gap-1">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Live Now
                                         </div>
-                                        <div className="flex items-center justify-between text-xs font-bold">
-                                            <div className="flex items-center gap-2 text-[#1C1C1E]/60"><Inbox size={12} /> Challenges</div>
-                                            <span>815,871</span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-xs font-bold">
-                                            <div className="flex items-center gap-2 text-[#1C1C1E]/60"><Check size={12} /> Hired</div>
-                                            <span className="text-proof-accent">102k</span>
-                                        </div>
+                                        <p className="text-[10px] font-bold text-[#1C1C1E]/30 uppercase tracking-widest">Global Discovery</p>
                                     </div>
                                 </motion.div>
 
+                                {/* Match Confidence Card */}
                                 <motion.div
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 2.0 }}
-                                    className="bg-white/80 backdrop-blur-2xl px-6 py-4 rounded-full shadow-glass border border-white flex justify-between items-center group cursor-pointer"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.8 }}
+                                    className="bg-white/60 backdrop-blur-2xl p-8 rounded-[2.5rem] shadow-glass border border-white flex flex-col justify-between aspect-square"
                                 >
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40 group-hover:text-[#1C1C1E] transition-colors">Proof Index</span>
-                                    <div className="w-5 h-5 rounded-full bg-[#1C1C1E]/5 flex items-center justify-center">
-                                        <ChevronDown size={12} strokeWidth={3} />
+                                    <div className="flex justify-between items-start">
+                                        <div className="w-10 h-10 rounded-xl bg-[#1C1C1E] flex items-center justify-center text-white">
+                                            <Zap size={20} fill="currentColor" />
+                                        </div>
+                                        <ArrowUpRight size={20} className="text-[#1C1C1E]/20" />
+                                    </div>
+                                    <div>
+                                        <div className="text-5xl font-black tracking-tighter mb-1">94%</div>
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40">Match Confidence</h4>
+                                    </div>
+                                </motion.div>
+
+                                {/* Hiring Velocity Card */}
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 1.0 }}
+                                    className="bg-white/60 backdrop-blur-2xl p-8 rounded-[2.5rem] shadow-glass border border-white flex flex-col justify-between aspect-square"
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="w-10 h-10 rounded-xl bg-proof-accent flex items-center justify-center text-white">
+                                            <TrendingUp size={20} strokeWidth={3} />
+                                        </div>
+                                        <div className="bg-green-500/10 text-green-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase">High Demand</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-5xl font-black tracking-tighter mb-1">12x</div>
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40">Hiring Velocity</h4>
                                     </div>
                                 </motion.div>
                             </div>
-                        </div>
+
+                            {/* Talent Flow Stats (Refined) */}
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: 1.2 }}
+                                className="w-full max-w-[540px] bg-[#1C1C1E] text-white p-6 rounded-[2.5rem] shadow-2xl flex items-center justify-between"
+                            >
+                                <div className="flex gap-8">
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Companies</p>
+                                        <p className="text-lg font-black tracking-tighter">2.4k</p>
+                                    </div>
+                                    <div className="w-px h-8 bg-white/10" />
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Proofs</p>
+                                        <p className="text-lg font-black tracking-tighter">815k</p>
+                                    </div>
+                                    <div className="w-px h-8 bg-white/10" />
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Hired</p>
+                                        <p className="text-lg font-black tracking-tighter text-proof-accent">102k</p>
+                                    </div>
+                                </div>
+                                <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all">
+                                    Proof Index <ChevronDown size={12} />
+                                </button>
+                            </motion.div>
+                        </motion.div>
                     </motion.div>
                 </section>
 
