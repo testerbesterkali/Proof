@@ -16,36 +16,41 @@ import { ChallengeCreation } from './screens/ChallengeCreation';
 import { SubmissionReview } from './screens/SubmissionReview';
 import { CandidateOnboarding } from './screens/CandidateOnboarding';
 import { ConnectedAccounts } from './screens/ConnectedAccounts';
+import { AuthCallback } from './screens/AuthCallback';
+import { AuthProvider } from './contexts/AuthContext';
 
 const queryClient = new QueryClient();
 
 export default function App() {
     return (
         <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-                <Routes>
-                    {/* Public */}
-                    <Route path="/" element={<LandingPage />} />
-                    <Route path="/signup" element={<Signup />} />
-                    <Route path="/onboarding/candidate" element={<CandidateOnboarding />} />
+            <AuthProvider>
+                <BrowserRouter>
+                    <Routes>
+                        {/* Public */}
+                        <Route path="/" element={<LandingPage />} />
+                        <Route path="/signup" element={<Signup />} />
+                        <Route path="/auth/callback" element={<AuthCallback />} />
+                        <Route path="/onboarding/candidate" element={<CandidateOnboarding />} />
 
-                    {/* Candidate */}
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/upload" element={<ProofUpload />} />
-                    <Route path="/challenges" element={<ChallengeDiscovery />} />
-                    <Route path="/challenge/:id" element={<ChallengeInterface />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/applications" element={<ApplicationTracker />} />
-                    <Route path="/messages" element={<Messages />} />
-                    <Route path="/settings/accounts" element={<ConnectedAccounts />} />
+                        {/* Candidate */}
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/upload" element={<ProofUpload />} />
+                        <Route path="/challenges" element={<ChallengeDiscovery />} />
+                        <Route path="/challenge/:id" element={<ChallengeInterface />} />
+                        <Route path="/analytics" element={<Analytics />} />
+                        <Route path="/applications" element={<ApplicationTracker />} />
+                        <Route path="/messages" element={<Messages />} />
+                        <Route path="/settings/accounts" element={<ConnectedAccounts />} />
 
-                    {/* Employer */}
-                    <Route path="/employer/onboarding" element={<EmployerOnboarding />} />
-                    <Route path="/employer/dashboard" element={<EmployerDashboard />} />
-                    <Route path="/employer/create-challenge" element={<ChallengeCreation />} />
-                    <Route path="/employer/review/:submissionId" element={<SubmissionReview />} />
-                </Routes>
-            </BrowserRouter>
+                        {/* Employer */}
+                        <Route path="/employer/onboarding" element={<EmployerOnboarding />} />
+                        <Route path="/employer/dashboard" element={<EmployerDashboard />} />
+                        <Route path="/employer/create-challenge" element={<ChallengeCreation />} />
+                        <Route path="/employer/review/:submissionId" element={<SubmissionReview />} />
+                    </Routes>
+                </BrowserRouter>
+            </AuthProvider>
         </QueryClientProvider>
     );
 }

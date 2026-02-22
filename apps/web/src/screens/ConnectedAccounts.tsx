@@ -1,98 +1,104 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
 import {
-    Github, Linkedin, Chrome, Globe, Shield, CheckCircle, XCircle,
-    ExternalLink, RefreshCw, Trash2, Plus, Mail, FileText, Figma
+    Github, Linkedin, Chrome, Globe, Shield, CheckCircle,
+    ExternalLink, RefreshCw, Trash2, Plus, Mail, Figma, LogOut, Loader2
 } from 'lucide-react';
 
-interface ConnectedAccount {
+interface AccountConfig {
     id: string;
+    provider: 'github' | 'google' | 'linkedin_oidc' | null;
     name: string;
     icon: React.ElementType;
     color: string;
     bgColor: string;
-    connected: boolean;
-    username?: string;
-    connectedAt?: string;
     description: string;
-    importedData?: string[];
 }
 
-const initialAccounts: ConnectedAccount[] = [
+const accountConfigs: AccountConfig[] = [
     {
         id: 'github',
+        provider: 'github',
         name: 'GitHub',
         icon: Github,
         color: 'text-[#1C1C1E]',
         bgColor: 'bg-[#1C1C1E]',
-        connected: true,
-        username: 'alexchen',
-        connectedAt: 'Feb 14, 2026',
         description: 'Import repos, contributions, and tech stack',
-        importedData: ['42 repositories', '1,247 contributions', '12 languages detected'],
     },
     {
-        id: 'linkedin',
+        id: 'linkedin_oidc',
+        provider: 'linkedin_oidc',
         name: 'LinkedIn',
         icon: Linkedin,
         color: 'text-[#0077B5]',
         bgColor: 'bg-[#0077B5]',
-        connected: true,
-        username: 'Alex Chen',
-        connectedAt: 'Feb 14, 2026',
         description: 'Verify identity and import work history',
-        importedData: ['5 positions imported', 'Identity verified', '127 connections'],
     },
     {
         id: 'google',
+        provider: 'google',
         name: 'Google',
         icon: Chrome,
         color: 'text-[#4285F4]',
         bgColor: 'bg-[#4285F4]',
-        connected: false,
         description: 'Sign in with Google and sync calendar for interviews',
     },
     {
         id: 'figma',
+        provider: null,
         name: 'Figma',
         icon: Figma,
         color: 'text-[#F24E1E]',
         bgColor: 'bg-[#F24E1E]',
-        connected: false,
-        description: 'Link design files as proof of work',
+        description: 'Link design files as proof of work (coming soon)',
     },
     {
         id: 'portfolio',
+        provider: null,
         name: 'Personal Website',
         icon: Globe,
         color: 'text-purple-600',
         bgColor: 'bg-purple-600',
-        connected: true,
-        username: 'alexchen.dev',
-        connectedAt: 'Feb 16, 2026',
-        description: 'Showcase your portfolio and personal brand',
-        importedData: ['Website verified'],
+        description: 'Showcase your portfolio and personal brand (coming soon)',
     },
 ];
 
 export function ConnectedAccounts() {
-    const [accounts, setAccounts] = useState(initialAccounts);
+    const { user, signInWithGoogle, signInWithGitHub, signInWithLinkedIn, signOut, linkedProviders, loading } = useAuth();
     const [syncing, setSyncing] = useState<string | null>(null);
+    const [connecting, setConnecting] = useState<string | null>(null);
 
-    const toggleConnection = (id: string) => {
-        setAccounts(prev => prev.map(a =>
-            a.id === id
-                ? {
-                    ...a,
-                    connected: !a.connected,
-                    ...(a.connected
-                        ? { username: undefined, connectedAt: undefined, importedData: undefined }
-                        : { username: 'Connected', connectedAt: 'Just now', importedData: ['Syncing data...'] }
-                    ),
-                }
-                : a
-        ));
+    const isProviderLinked = (provider: string | null) => {
+        if (!provider || !user) return false;
+        return linkedProviders.includes(provider);
+    };
+
+    const getIdentityForProvider = (provider: string | null) => {
+        if (!provider || !user?.identities) return null;
+        return user.identities.find(i => i.provider === provider);
+    };
+
+    const handleConnect = async (account: AccountConfig) => {
+        if (!account.provider) return;
+        setConnecting(account.id);
+        try {
+            switch (account.provider) {
+                case 'google':
+                    await signInWithGoogle();
+                    break;
+                case 'github':
+                    await signInWithGitHub();
+                    break;
+                case 'linkedin_oidc':
+                    await signInWithLinkedIn();
+                    break;
+            }
+        } catch (err) {
+            console.error('OAuth error:', err);
+        }
+        setConnecting(null);
     };
 
     const syncAccount = (id: string) => {
@@ -100,11 +106,11 @@ export function ConnectedAccounts() {
         setTimeout(() => setSyncing(null), 2000);
     };
 
-    const connectedCount = accounts.filter(a => a.connected).length;
+    const connectedCount = accountConfigs.filter(a => isProviderLinked(a.provider)).length;
 
     return (
         <Layout>
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col pb-20">
                 {/* Header */}
                 <div className="mb-10">
                     <h1 className="text-3xl font-bold tracking-tight mb-2">Connected Accounts</h1>
@@ -112,6 +118,33 @@ export function ConnectedAccounts() {
                         Manage linked services to auto-import skills, verify identity, and strengthen your profile.
                     </p>
                 </div>
+
+                {/* User info banner if logged in */}
+                {user && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white/60 backdrop-blur-2xl border border-white rounded-2xl p-5 shadow-glass mb-6 flex items-center gap-4"
+                    >
+                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                            <img
+                                src={user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user.email}&background=1C1C1E&color=fff`}
+                                alt="Avatar"
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-bold text-sm">{user.user_metadata?.full_name || user.user_metadata?.name || user.email}</p>
+                            <p className="text-xs text-[#1C1C1E]/40 font-medium">{user.email}</p>
+                        </div>
+                        <button
+                            onClick={signOut}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 border border-red-100 text-red-500 text-xs font-bold hover:bg-red-100 transition-colors"
+                        >
+                            <LogOut size={14} /> Sign Out
+                        </button>
+                    </motion.div>
+                )}
 
                 {/* Trust Score Banner */}
                 <motion.div
@@ -127,87 +160,114 @@ export function ConnectedAccounts() {
                         <p className="text-white/50 text-sm">Each connected account increases your credibility with employers.</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-3xl font-bold text-proof-accent">{connectedCount}/{accounts.length}</p>
+                        <p className="text-3xl font-bold text-proof-accent">{connectedCount}/{accountConfigs.length}</p>
                         <p className="text-xs text-white/40 font-medium">accounts linked</p>
                     </div>
                 </motion.div>
 
                 {/* Accounts List */}
                 <div className="space-y-4">
-                    {accounts.map((account, i) => (
-                        <motion.div
-                            key={account.id}
-                            initial={{ opacity: 0, y: 15 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.08 }}
-                            className={`bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass transition-all ${account.connected ? 'border-green-100' : 'border-white hover:border-black/10'}`}
-                        >
-                            <div className="flex items-start gap-5">
-                                {/* Icon */}
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${account.connected ? 'bg-green-50' : 'bg-[#F8F9FB]'}`}>
-                                    <account.icon className={`w-6 h-6 ${account.connected ? 'text-green-600' : account.color}`} />
-                                </div>
+                    {accountConfigs.map((account, i) => {
+                        const linked = isProviderLinked(account.provider);
+                        const identity = getIdentityForProvider(account.provider);
+                        const displayName = identity?.identity_data?.full_name
+                            || identity?.identity_data?.name
+                            || identity?.identity_data?.preferred_username
+                            || identity?.identity_data?.user_name
+                            || identity?.identity_data?.email
+                            || null;
+                        const connectedDate = identity?.created_at
+                            ? new Date(identity.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : null;
 
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <p className="font-bold text-base">{account.name}</p>
-                                        {account.connected && (
-                                            <span className="text-[10px] font-bold tracking-widest uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Connected</span>
-                                        )}
+                        return (
+                            <motion.div
+                                key={account.id}
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.08 }}
+                                className={`bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass transition-all ${linked ? 'border-green-100' : 'border-white hover:border-black/10'}`}
+                            >
+                                <div className="flex items-start gap-5">
+                                    {/* Icon */}
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${linked ? 'bg-green-50' : 'bg-[#F8F9FB]'}`}>
+                                        <account.icon className={`w-6 h-6 ${linked ? 'text-green-600' : account.color}`} />
                                     </div>
-                                    <p className="text-sm text-[#1C1C1E]/40 font-medium">{account.description}</p>
 
-                                    {account.connected && account.username && (
-                                        <div className="mt-3 bg-[#F8F9FB] rounded-xl p-3 border border-black/5">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm font-semibold text-[#1C1C1E]">{account.username}</p>
-                                                <p className="text-xs text-[#1C1C1E]/30 font-medium">since {account.connectedAt}</p>
-                                            </div>
-                                            {account.importedData && (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {account.importedData.map(d => (
-                                                        <span key={d} className="text-xs bg-white border border-black/5 text-[#1C1C1E]/60 px-2.5 py-1 rounded-lg font-medium">
-                                                            {d}
-                                                        </span>
-                                                    ))}
-                                                </div>
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className="font-bold text-base">{account.name}</p>
+                                            {linked && (
+                                                <span className="text-[10px] font-bold tracking-widest uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <CheckCircle size={10} /> Connected
+                                                </span>
+                                            )}
+                                            {!account.provider && (
+                                                <span className="text-[10px] font-bold tracking-widest uppercase bg-[#F8F9FB] text-[#1C1C1E]/30 px-2 py-0.5 rounded-full">Coming Soon</span>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                        <p className="text-sm text-[#1C1C1E]/40 font-medium">{account.description}</p>
 
-                                {/* Actions */}
-                                <div className="flex items-center gap-2 shrink-0">
-                                    {account.connected ? (
-                                        <>
+                                        {linked && displayName && (
+                                            <div className="mt-3 bg-[#F8F9FB] rounded-xl p-3 border border-black/5">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        {identity?.identity_data?.avatar_url && (
+                                                            <img src={identity.identity_data.avatar_url} alt="" className="w-5 h-5 rounded-full" />
+                                                        )}
+                                                        <p className="text-sm font-semibold text-[#1C1C1E]">{displayName}</p>
+                                                    </div>
+                                                    {connectedDate && (
+                                                        <p className="text-xs text-[#1C1C1E]/30 font-medium">since {connectedDate}</p>
+                                                    )}
+                                                </div>
+                                                {identity?.identity_data?.email && (
+                                                    <span className="text-xs bg-white border border-black/5 text-[#1C1C1E]/60 px-2.5 py-1 rounded-lg font-medium">
+                                                        {identity.identity_data.email}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {linked ? (
+                                            <>
+                                                <button
+                                                    onClick={() => syncAccount(account.id)}
+                                                    className="w-9 h-9 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                                                    title="Re-sync"
+                                                >
+                                                    <RefreshCw className={`w-4 h-4 text-[#1C1C1E]/40 ${syncing === account.id ? 'animate-spin' : ''}`} />
+                                                </button>
+                                            </>
+                                        ) : account.provider ? (
                                             <button
-                                                onClick={() => syncAccount(account.id)}
-                                                className="w-9 h-9 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                                                title="Re-sync"
+                                                onClick={() => handleConnect(account)}
+                                                disabled={connecting === account.id}
+                                                className={`flex items-center gap-2 ${account.bgColor} text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50`}
                                             >
-                                                <RefreshCw className={`w-4 h-4 text-[#1C1C1E]/40 ${syncing === account.id ? 'animate-spin' : ''}`} />
+                                                {connecting === account.id ? (
+                                                    <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
+                                                ) : (
+                                                    <><Plus className="w-4 h-4" /> Connect</>
+                                                )}
                                             </button>
+                                        ) : (
                                             <button
-                                                onClick={() => toggleConnection(account.id)}
-                                                className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center hover:bg-red-100 transition-colors"
-                                                title="Disconnect"
+                                                disabled
+                                                className="flex items-center gap-2 bg-[#F8F9FB] text-[#1C1C1E]/30 px-5 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed"
                                             >
-                                                <Trash2 className="w-4 h-4 text-red-400" />
+                                                <Plus className="w-4 h-4" /> Connect
                                             </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            onClick={() => toggleConnection(account.id)}
-                                            className={`flex items-center gap-2 ${account.bgColor} text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity`}
-                                        >
-                                            <Plus className="w-4 h-4" /> Connect
-                                        </button>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </motion.div>
-                    ))}
+                            </motion.div>
+                        );
+                    })}
                 </div>
 
                 {/* Email Notifications Setting */}

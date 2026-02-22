@@ -54,9 +54,9 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
                     <motion.div
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="w-12 h-12 rounded-2xl bg-[#1C1C1E] flex items-center justify-center text-white font-black text-xl relative z-10 shadow-lg group-hover:bg-proof-accent transition-colors"
+                        className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center relative z-10 shadow-lg border border-black/5"
                     >
-                        P
+                        <span className="font-black text-xl text-[#1C1C1E] leading-none">P</span><span className="font-black text-xl text-proof-accent leading-none">.</span>
                     </motion.div>
                     <div className="absolute w-8 h-8 -bottom-3 -right-3 rounded-full border-2 border-white overflow-hidden z-20 shadow-md">
                         <img src="https://i.pravatar.cc/100?img=33" alt="User" className="w-full h-full object-cover" />
