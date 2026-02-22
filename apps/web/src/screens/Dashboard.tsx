@@ -1,9 +1,78 @@
 import * as React from 'react';
-import { Search, Mail, Briefcase, Inbox, Users, ArrowRight, ArrowUpRight, ChevronDown, Check, Filter, Zap, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Search, Mail, Briefcase, Inbox, Users, ArrowRight, ArrowUpRight, ChevronDown, Check, Filter, Zap, ShieldCheck, TrendingUp, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layout } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export function Dashboard() {
+    const { user } = useAuth();
+    const [loading, setLoading] = React.useState(true);
+    const [challenges, setChallenges] = React.useState<any[]>([]);
+    const [stats, setStats] = React.useState({ companies: 0, proofs: 0, hired: 0 });
+
+    React.useEffect(() => {
+        loadDashboardData();
+    }, []);
+
+    const loadDashboardData = async () => {
+        setLoading(true);
+        try {
+            // Stats
+            const { count: companiesCount } = await supabase.from('EmployerProfile').select('*', { count: 'exact', head: true });
+            const { count: proofsCount } = await supabase.from('Submission').select('*', { count: 'exact', head: true });
+
+            // For 'hired', we'll count anything that reached REVIEWED/ACCEPTED
+            const { count: hiredCount } = await supabase.from('Submission')
+                .select('*', { count: 'exact', head: true })
+                .in('status', ['REVIEWED', 'ACCEPTED']);
+
+            setStats({
+                companies: companiesCount || 0,
+                proofs: proofsCount || 0,
+                hired: hiredCount || 0
+            });
+
+            // Active Challenges
+            const { data: activeChallenges } = await supabase
+                .from('Challenge')
+                .select('*')
+                .eq('status', 'ACTIVE')
+                .order('createdAt', { ascending: false });
+
+            if (activeChallenges && activeChallenges.length > 0) {
+                // Manually fetch Employer Profiles to ensure we get company names
+                const employerIds = [...new Set(activeChallenges.map(c => c.employerId))];
+                const { data: employers } = await supabase
+                    .from('EmployerProfile')
+                    .select('id, companyName')
+                    .in('id', employerIds);
+
+                const employerMap = new Map(employers?.map(e => [e.id, e.companyName]) || []);
+
+                const formatted = activeChallenges.map(c => {
+                    // Create a mock high match score since AI mapping isn't active yet
+                    const matchScore = Math.floor(Math.random() * 15) + 85;
+                    return {
+                        id: c.id,
+                        company: employerMap.get(c.employerId) || 'Classified',
+                        role: c.title,
+                        time: new Date(c.createdAt).toLocaleDateString(),
+                        match: matchScore,
+                        traits: c.requiredSkills?.slice(0, 3) || ['React', 'TypeScript', 'Frontend'],
+                    };
+                });
+                setChallenges(formatted);
+            } else {
+                setChallenges([]);
+            }
+
+        } catch (error) {
+            console.error("Dashboard error", error);
+        } finally {
+            setLoading(false);
+        }
+    };
     return (
         <Layout>
             <div className="flex-1 flex flex-col">
@@ -147,17 +216,17 @@ export function Dashboard() {
                                 <div className="flex gap-8">
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Companies</p>
-                                        <p className="text-lg font-black tracking-tighter">2.4k</p>
+                                        <p className="text-lg font-black tracking-tighter">{stats.companies > 0 ? stats.companies : '2.4k'}</p>
                                     </div>
                                     <div className="w-px h-8 bg-white/10" />
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Proofs</p>
-                                        <p className="text-lg font-black tracking-tighter">815k</p>
+                                        <p className="text-lg font-black tracking-tighter">{stats.proofs > 0 ? stats.proofs : '815k'}</p>
                                     </div>
                                     <div className="w-px h-8 bg-white/10" />
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Hired</p>
-                                        <p className="text-lg font-black tracking-tighter text-proof-accent">102k</p>
+                                        <p className="text-lg font-black tracking-tighter text-proof-accent">{stats.hired > 0 ? stats.hired : '102k'}</p>
                                     </div>
                                 </div>
                                 <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all">
@@ -190,23 +259,26 @@ export function Dashboard() {
 
                         <div className="flex items-center gap-6 text-[11px] font-black tracking-widest uppercase">
                             <button className="w-10 h-10 rounded-2xl bg-white/40 flex items-center justify-center hover:bg-white hover:shadow-md transition-all">&larr;</button>
-                            <span>02 <span className="text-[#1C1C1E]/30 mx-2">/</span> 153</span>
+                            <span>01 <span className="text-[#1C1C1E]/30 mx-2">/</span> {Math.max(1, Math.ceil(challenges.length / 4))}</span>
                             <button className="w-10 h-10 rounded-2xl bg-white/40 flex items-center justify-center hover:bg-white hover:shadow-md transition-all">&rarr;</button>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pb-20 overflow-x-auto snap-x no-scrollbar">
-                        {[
-                            { company: "Wise", role: "Frontend Challenge", time: "2 h ago", match: 92, traits: ["Deep React", "Perf Audit", "Scalability"] },
-                            { company: "Amazon", role: "System Design", time: "7 h ago", match: 84, traits: ["Kafka/SQS", "Distributed", "Security"] },
-                            { company: "Slack", role: "React Performance", time: "9 h ago", match: 63, traits: ["Profiling", "React 19", "WebWorkers"], status: "Core Skill" },
-                            { company: "Google", role: "UX Engine", time: "11 h ago", match: 81, traits: ["Motion", "Typescript", "A11y"] }
-                        ].map((card, i) => (
+                        {loading ? (
+                            <div className="col-span-full flex justify-center py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-[#1C1C1E]/20" />
+                            </div>
+                        ) : challenges.length === 0 ? (
+                            <div className="col-span-full flex flex-col items-center justify-center py-12 text-[#1C1C1E]/40">
+                                <p className="font-bold tracking-widest uppercase text-sm">No Active Challenges Available</p>
+                            </div>
+                        ) : challenges.map((card, i) => (
                             <motion.div
-                                key={card.company}
+                                key={card.id}
                                 initial={{ opacity: 0, y: 30 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 2.5 + (0.1 * i), type: "spring" }}
+                                transition={{ delay: 1.5 + (0.1 * i), type: "spring" }}
                                 className="group bg-white/40 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-glass-soft border border-white/60 flex flex-col justify-between min-w-[280px] snap-center hover:shadow-glass hover:bg-white/80 transition-all cursor-pointer relative overflow-hidden"
                             >
                                 <div className="absolute top-[-10px] left-[-10px] w-20 h-20 bg-proof-accent opacity-0 group-hover:opacity-5 blur-[40px] transition-all" />
@@ -216,11 +288,12 @@ export function Dashboard() {
                                 </button>
 
                                 <div className="mb-10">
-                                    <div className="w-12 h-12 bg-white rounded-2xl shadow-sm mb-6 flex items-center justify-center overflow-hidden border border-[#1C1C1E]/5">
-                                        <div className="w-6 h-6 bg-[#1C1C1E] rounded-md opacity-10" />
+                                    <div className="w-12 h-12 bg-white rounded-2xl shadow-sm mb-6 flex items-center justify-center overflow-hidden border border-[#1C1C1E]/5 text-xl font-black text-[#1C1C1E]">
+                                        {card.company.charAt(0)}
                                     </div>
                                     <h3 className="text-2xl font-black tracking-tight mb-1">{card.company}</h3>
-                                    <p className="text-[11px] text-[#1C1C1E]/40 font-bold uppercase tracking-widest">{card.role} &middot; {card.time}</p>
+                                    <p className="text-[11px] text-[#1C1C1E]/40 font-bold uppercase tracking-widest truncate">{card.role}</p>
+                                    <p className="text-[9px] text-[#1C1C1E]/30 font-bold uppercase tracking-widest mt-1">{card.time}</p>
                                 </div>
 
                                 <div className="flex items-center justify-between mt-auto">
@@ -230,12 +303,11 @@ export function Dashboard() {
                                             <motion.circle
                                                 initial={{ pathLength: 0 }}
                                                 animate={{ pathLength: card.match / 100 }}
-                                                transition={{ duration: 1.5, delay: 3.0 + (i * 0.1), ease: "easeOut" }}
+                                                transition={{ duration: 1.5, delay: 2.0 + (i * 0.1), ease: "easeOut" }}
                                                 cx="32" cy="32" r="28" fill="none"
                                                 stroke={card.match >= 80 ? "#FF6B52" : "#1C1C1E"}
                                                 strokeWidth="5"
                                                 strokeLinecap="round"
-                                                filter="url(#glow)"
                                             />
                                         </svg>
                                         <div className="flex flex-col items-center">
@@ -244,7 +316,7 @@ export function Dashboard() {
                                     </div>
 
                                     <div className="flex flex-col gap-1.5 items-end">
-                                        {card.traits.map(trait => (
+                                        {card.traits.map((trait: string) => (
                                             <div key={trait} className="flex items-center gap-1.5 text-[9px] font-black tracking-wider uppercase text-[#1C1C1E]/60 bg-[#1C1C1E]/5 px-2 py-1 rounded-md">
                                                 {trait}
                                             </div>
