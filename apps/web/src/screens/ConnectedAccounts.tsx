@@ -66,7 +66,7 @@ const accountConfigs: AccountConfig[] = [
 ];
 
 export function ConnectedAccounts() {
-    const { user, signInWithGoogle, signInWithGitHub, signInWithLinkedIn, signOut, linkedProviders, loading } = useAuth();
+    const { user, linkProvider, signOut, linkedProviders, loading } = useAuth();
     const [syncing, setSyncing] = useState<string | null>(null);
     const [connecting, setConnecting] = useState<string | null>(null);
 
@@ -85,19 +85,9 @@ export function ConnectedAccounts() {
         setConnecting(account.id);
         const redirect = window.location.origin + '/settings/accounts';
         try {
-            switch (account.provider) {
-                case 'google':
-                    await signInWithGoogle(redirect);
-                    break;
-                case 'github':
-                    await signInWithGitHub(redirect);
-                    break;
-                case 'linkedin_oidc':
-                    await signInWithLinkedIn(redirect);
-                    break;
-            }
+            await linkProvider(account.provider, redirect);
         } catch (err) {
-            console.error('OAuth error:', err);
+            console.error('Link identity error:', err);
         }
         setConnecting(null);
     };

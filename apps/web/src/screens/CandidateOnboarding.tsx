@@ -52,7 +52,7 @@ export function CandidateOnboarding() {
     const [linkedinConnected, setLinkedinConnected] = useState(false);
 
     // Auth
-    const { user, signInWithLinkedIn, signInWithGitHub, linkedProviders } = useAuth();
+    const { user, signInWithLinkedIn, linkProvider, linkedProviders } = useAuth();
 
     // Sync LinkedIn connected state from auth
     useEffect(() => {
@@ -488,7 +488,7 @@ export function CandidateOnboarding() {
                                     <button
                                         onClick={() => {
                                             if (!githubConnected) {
-                                                signInWithGitHub(window.location.origin + '/onboarding/candidate?step=4');
+                                                linkProvider('github', window.location.origin + '/onboarding/candidate?step=4');
                                             }
                                         }}
                                         className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${githubConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10 cursor-pointer'}`}
@@ -510,7 +510,7 @@ export function CandidateOnboarding() {
                                     <button
                                         onClick={() => {
                                             if (!linkedinConnected) {
-                                                signInWithLinkedIn(window.location.origin + '/onboarding/candidate?step=4');
+                                                linkProvider('linkedin_oidc', window.location.origin + '/onboarding/candidate?step=4');
                                             }
                                         }}
                                         className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${linkedinConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10 cursor-pointer'}`}

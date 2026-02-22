@@ -11,6 +11,7 @@ interface AuthContextType {
     signInWithGoogle: (redirectTo?: string) => Promise<void>;
     signInWithGitHub: (redirectTo?: string) => Promise<void>;
     signInWithLinkedIn: (redirectTo?: string) => Promise<void>;
+    linkProvider: (provider: 'google' | 'github' | 'linkedin_oidc', redirectTo?: string) => Promise<void>;
     signOut: () => Promise<void>;
     linkedProviders: string[];
 }
@@ -111,6 +112,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
     };
 
+    // Link an additional provider to the current user (preserves session)
+    const linkProvider = async (provider: 'google' | 'github' | 'linkedin_oidc', redirectTo?: string) => {
+        await supabase.auth.linkIdentity({
+            provider,
+            options: {
+                redirectTo: redirectTo || window.location.href,
+            },
+        });
+    };
+
     const signOut = async () => {
         await supabase.auth.signOut();
         setLinkedProviders([]);
@@ -126,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             signInWithGoogle,
             signInWithGitHub,
             signInWithLinkedIn,
+            linkProvider,
             signOut,
             linkedProviders,
         }}>

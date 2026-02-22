@@ -1,176 +1,332 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Globe, Users, ArrowRight, Check, ShieldCheck, Mail, Zap } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Building2, Globe, Users, ArrowRight, ArrowLeft, ShieldCheck, Mail, Zap, Loader2, CheckCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { SuggestionInput } from '../components/SuggestionInput';
+
+const industrySuggestions = [
+    'Artificial Intelligence', 'Machine Learning', 'AI/ML', 'Deep Learning',
+    'Fintech', 'Banking', 'InsurTech', 'Payments', 'Blockchain',
+    'SaaS', 'Enterprise Software', 'Developer Tools', 'DevOps', 'Cloud Computing',
+    'Cybersecurity', 'InfoSec', 'Data Privacy',
+    'HealthTech', 'MedTech', 'Biotech', 'Pharma', 'Telemedicine',
+    'EdTech', 'E-Learning', 'Online Education',
+    'E-Commerce', 'Retail', 'DTC', 'Marketplace',
+    'Real Estate', 'PropTech', 'Construction Tech',
+    'CleanTech', 'Energy', 'Sustainability', 'Climate Tech',
+    'Media', 'Entertainment', 'Gaming', 'Streaming',
+    'Social Media', 'Community', 'Creator Economy',
+    'Logistics', 'Supply Chain', 'Shipping', 'FoodTech',
+    'Automotive', 'Electric Vehicles', 'Autonomous Driving',
+    'Aerospace', 'Defense', 'SpaceTech',
+    'LegalTech', 'RegTech', 'GovTech',
+    'HR Tech', 'Recruiting', 'Staffing', 'Workforce Management',
+    'Marketing Tech', 'AdTech', 'Analytics',
+    'IoT', 'Hardware', 'Robotics', 'Manufacturing',
+    'Travel', 'Hospitality', 'Tourism',
+    'Telecommunications', 'Networking', '5G',
+    'Web3', 'Crypto', 'DeFi', 'NFTs',
+    'Agriculture', 'AgriTech',
+    'Consulting', 'Professional Services', 'Agency',
+    'Non-Profit', 'NGO', 'Social Impact',
+];
+
+const companySizes = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5000+'];
+
+const totalSteps = 3;
 
 export function EmployerOnboarding() {
-    const [step, setStep] = React.useState(1);
-    const [formData, setFormData] = React.useState({
-        companyName: '',
-        industry: '',
-        website: '',
-        email: ''
-    });
     const navigate = useNavigate();
+    const [step, setStep] = React.useState(1);
 
-    const handleNext = () => {
-        if (step < 3) {
-            setStep(step + 1);
-        } else {
-            // In a real app, we'd save the profile here
+    // Step 1 — Company Basics
+    const [companyName, setCompanyName] = React.useState('');
+    const [industry, setIndustry] = React.useState('');
+    const [companySize, setCompanySize] = React.useState('');
+
+    // Step 2 — Domain Verification
+    const [website, setWebsite] = React.useState('');
+    const [workEmail, setWorkEmail] = React.useState('');
+
+    // Saving
+    const [saving, setSaving] = React.useState(false);
+    const [saveError, setSaveError] = React.useState('');
+
+    const { user } = useAuth();
+
+    const canProceed = () => {
+        if (step === 1) return companyName.trim() !== '';
+        if (step === 2) return website.trim() !== '';
+        return true;
+    };
+
+    const handleFinish = async () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        setSaving(true);
+        setSaveError('');
+
+        try {
+            const { error: userError } = await supabase
+                .from('User')
+                .upsert({
+                    id: user.id,
+                    email: user.email || '',
+                    role: 'EMPLOYER',
+                    updatedAt: new Date().toISOString(),
+                }, { onConflict: 'id' });
+
+            if (userError) throw userError;
+
+            const profileId = crypto.randomUUID();
+            const { data: existing } = await supabase
+                .from('EmployerProfile')
+                .select('id')
+                .eq('userId', user.id)
+                .single();
+
+            const profileData = {
+                userId: user.id,
+                companyName: companyName || null,
+                industry: industry || null,
+                companySize: companySize || null,
+                verifiedUrl: website || null,
+                workEmail: workEmail || null,
+                onboardingCompleted: true,
+                updatedAt: new Date().toISOString(),
+            };
+
+            if (existing?.id) {
+                const { error: profileError } = await supabase
+                    .from('EmployerProfile')
+                    .update(profileData)
+                    .eq('id', existing.id);
+                if (profileError) throw profileError;
+            } else {
+                const { error: profileError } = await supabase
+                    .from('EmployerProfile')
+                    .insert({
+                        id: profileId,
+                        ...profileData,
+                        createdAt: new Date().toISOString(),
+                    });
+                if (profileError) throw profileError;
+            }
+
             navigate('/employer/dashboard');
+        } catch (err: any) {
+            console.error('Save error:', err);
+            setSaveError(err.message || 'Failed to save profile. Please try again.');
+        } finally {
+            setSaving(false);
         }
     };
 
-    const containerVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
-        exit: { opacity: 0, y: -20, transition: { duration: 0.4, ease: "easeIn" } }
-    };
-
     return (
-        <div className="min-h-screen bg-[#E4E5E7] text-[#1C1C1E] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-            {/* Background Mesh Gradient Decor */}
-            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-proof-accent/10 blur-[120px] rounded-full animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-blue-400/10 blur-[100px] rounded-full" />
+        <div className="min-h-screen bg-[#F8F9FB] text-[#1C1C1E] flex flex-col">
+            {/* Header */}
+            <div className="px-8 pt-8 pb-4 flex items-center justify-between">
+                <Link to="/" className="text-2xl font-bold">proof<span className="text-proof-accent">.</span></Link>
+                <button onClick={handleFinish} className="text-sm text-[#1C1C1E]/40 font-medium hover:text-[#1C1C1E] transition-colors">
+                    Skip for now →
+                </button>
+            </div>
 
-            <div className="w-full max-w-xl relative z-10">
-                {/* Logo & Progress */}
-                <div className="flex flex-col items-center mb-12">
-                    <div className="w-16 h-16 bg-[#1C1C1E] text-white rounded-2xl flex items-center justify-center text-3xl font-black mb-6 shadow-xl">
-                        P
-                    </div>
-                    <div className="flex gap-2">
-                        {[1, 2, 3].map((s) => (
-                            <div
-                                key={s}
-                                className={`h-1.5 rounded-full transition-all duration-500 ${s === step ? 'w-8 bg-[#1C1C1E]' : s < step ? 'w-4 bg-[#1C1C1E]/40' : 'w-4 bg-[#1C1C1E]/10'
-                                    }`}
-                            />
-                        ))}
-                    </div>
+            {/* Progress bar */}
+            <div className="px-8 mb-8">
+                <div className="flex items-center gap-2 max-w-2xl mx-auto">
+                    {Array.from({ length: totalSteps }).map((_, i) => (
+                        <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i < step ? 'bg-[#1C1C1E]' : 'bg-black/5'}`} />
+                    ))}
                 </div>
+                <p className="text-center text-xs text-[#1C1C1E]/30 font-bold mt-3 tracking-widest uppercase">Step {step} of {totalSteps}</p>
+            </div>
 
-                <AnimatePresence mode="wait">
-                    {step === 1 && (
-                        <motion.div
-                            key="step1"
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            exit="exit"
-                            className="bg-white/60 backdrop-blur-2xl border border-white p-12 rounded-[3.5rem] shadow-glass"
-                        >
-                            <h2 className="text-4xl font-black tracking-tighter mb-4 text-center">TELL US ABOUT<br />YOUR COMPANY</h2>
-                            <p className="text-[#1C1C1E]/50 text-center mb-10 font-medium">Let's set up your employer profile for Proof.</p>
-
-                            <div className="space-y-6">
-                                <div className="relative group">
-                                    <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-[#1C1C1E]/30 group-focus-within:text-proof-accent transition-colors" size={20} />
-                                    <input
-                                        type="text"
-                                        placeholder="Company Name"
-                                        className="w-full bg-white/80 border border-white rounded-3xl py-6 pl-16 pr-6 focus:outline-none focus:ring-2 focus:ring-proof-accent/20 transition-all font-bold tracking-tight placeholder:text-[#1C1C1E]/20"
-                                        value={formData.companyName}
-                                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                                    />
+            {/* Content */}
+            <div className="flex-1 flex items-start justify-center px-8 pb-12">
+                <div className="w-full max-w-2xl">
+                    <AnimatePresence mode="wait">
+                        {/* STEP 1: Company Basics */}
+                        {step === 1 && (
+                            <motion.div key="s1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+                                <div className="text-center mb-10">
+                                    <div className="w-16 h-16 rounded-2xl bg-[#1C1C1E] flex items-center justify-center mx-auto mb-5">
+                                        <Building2 className="w-8 h-8 text-white" />
+                                    </div>
+                                    <h1 className="text-3xl font-bold tracking-tight mb-2">Tell us about your company</h1>
+                                    <p className="text-[#1C1C1E]/50 font-medium">Let's set up your employer profile for Proof.</p>
                                 </div>
-                                <div className="relative group">
-                                    <Zap className="absolute left-6 top-1/2 -translate-y-1/2 text-[#1C1C1E]/30 group-focus-within:text-proof-accent transition-colors" size={20} />
-                                    <input
-                                        type="text"
-                                        placeholder="Industry (e.g. Fintech, AI)"
-                                        className="w-full bg-white/80 border border-white rounded-3xl py-6 pl-16 pr-6 focus:outline-none focus:ring-2 focus:ring-proof-accent/20 transition-all font-bold tracking-tight placeholder:text-[#1C1C1E]/20"
-                                        value={formData.industry}
-                                        onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
 
-                    {step === 2 && (
-                        <motion.div
-                            key="step2"
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            exit="exit"
-                            className="bg-white/60 backdrop-blur-2xl border border-white p-12 rounded-[3.5rem] shadow-glass"
-                        >
-                            <h2 className="text-4xl font-black tracking-tighter mb-4 text-center">VERIFY<br />YOUR DOMAIN</h2>
-                            <p className="text-[#1C1C1E]/50 text-center mb-10 font-medium">We only allow verified company representatives.</p>
-
-                            <div className="space-y-6">
-                                <div className="relative group">
-                                    <Globe className="absolute left-6 top-1/2 -translate-y-1/2 text-[#1C1C1E]/30 group-focus-within:text-proof-accent transition-colors" size={20} />
-                                    <input
-                                        type="text"
-                                        placeholder="Company Website"
-                                        className="w-full bg-white/80 border border-white rounded-3xl py-6 pl-16 pr-6 focus:outline-none focus:ring-2 focus:ring-proof-accent/20 transition-all font-bold tracking-tight placeholder:text-[#1C1C1E]/20"
-                                        value={formData.website}
-                                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                                    />
-                                </div>
-                                <div className="relative group">
-                                    <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-[#1C1C1E]/30 group-focus-within:text-proof-accent transition-colors" size={20} />
-                                    <input
-                                        type="email"
-                                        placeholder="Work Email"
-                                        className="w-full bg-white/80 border border-white rounded-3xl py-6 pl-16 pr-6 focus:outline-none focus:ring-2 focus:ring-proof-accent/20 transition-all font-bold tracking-tight placeholder:text-[#1C1C1E]/20"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {step === 3 && (
-                        <motion.div
-                            key="step3"
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            exit="exit"
-                            className="bg-white/60 backdrop-blur-2xl border border-white p-12 rounded-[3.5rem] shadow-glass text-center"
-                        >
-                            <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-sm">
-                                <ShieldCheck size={48} strokeWidth={2.5} />
-                            </div>
-                            <h2 className="text-4xl font-black tracking-tighter mb-4">YOU'RE ALL SET!</h2>
-                            <p className="text-[#1C1C1E]/50 mb-10 font-medium px-4">Your company profile is active. You can now start posting challenges and reviewing proofs.</p>
-
-                            <div className="bg-[#1C1C1E]/5 border border-[#1C1C1E]/10 rounded-[2rem] p-6 text-left mb-8">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40 mb-3">Next Action</h4>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#1C1C1E] shadow-sm">
-                                        <ArrowRight size={20} />
+                                <div className="bg-white/60 backdrop-blur-2xl border border-white rounded-[2rem] p-8 shadow-glass space-y-5">
+                                    <div>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Company Name</label>
+                                        <SuggestionInput
+                                            value={companyName}
+                                            onChange={setCompanyName}
+                                            suggestions={[]}
+                                            placeholder="Your company name"
+                                            icon={<Building2 className="w-5 h-5" />}
+                                        />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-sm">Create your first challenge</p>
-                                        <p className="text-xs text-[#1C1C1E]/40">Attract top talent with work samples.</p>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Industry</label>
+                                        <SuggestionInput
+                                            value={industry}
+                                            onChange={setIndustry}
+                                            suggestions={industrySuggestions}
+                                            placeholder="e.g. Fintech, AI, SaaS"
+                                            icon={<Zap className="w-5 h-5" />}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-3">Company Size</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {companySizes.map(size => (
+                                                <button
+                                                    key={size}
+                                                    onClick={() => setCompanySize(size)}
+                                                    className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${companySize === size ? 'bg-[#1C1C1E] text-white' : 'bg-[#F8F9FB] border border-black/5 text-[#1C1C1E]/60 hover:border-black/10'}`}
+                                                >
+                                                    {companySize === size && <CheckCircle className="w-3.5 h-3.5 inline mr-1.5" />}
+                                                    {size}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
+                            </motion.div>
+                        )}
+
+                        {/* STEP 2: Domain Verification */}
+                        {step === 2 && (
+                            <motion.div key="s2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+                                <div className="text-center mb-10">
+                                    <div className="w-16 h-16 rounded-2xl bg-[#1C1C1E] flex items-center justify-center mx-auto mb-5">
+                                        <Globe className="w-8 h-8 text-white" />
+                                    </div>
+                                    <h1 className="text-3xl font-bold tracking-tight mb-2">Verify your domain</h1>
+                                    <p className="text-[#1C1C1E]/50 font-medium">We only allow verified company representatives.</p>
+                                </div>
+
+                                <div className="bg-white/60 backdrop-blur-2xl border border-white rounded-[2rem] p-8 shadow-glass space-y-5">
+                                    <div>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Company Website</label>
+                                        <SuggestionInput
+                                            value={website}
+                                            onChange={setWebsite}
+                                            suggestions={[]}
+                                            placeholder="https://yourcompany.com"
+                                            icon={<Globe className="w-5 h-5" />}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Work Email</label>
+                                        <SuggestionInput
+                                            value={workEmail}
+                                            onChange={setWorkEmail}
+                                            suggestions={[]}
+                                            placeholder="you@yourcompany.com"
+                                            icon={<Mail className="w-5 h-5" />}
+                                        />
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* STEP 3: Confirmation */}
+                        {step === 3 && (
+                            <motion.div key="s3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+                                <div className="text-center mb-10">
+                                    <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center mx-auto mb-5">
+                                        <ShieldCheck className="w-8 h-8 text-green-600" />
+                                    </div>
+                                    <h1 className="text-3xl font-bold tracking-tight mb-2">You're all set!</h1>
+                                    <p className="text-[#1C1C1E]/50 font-medium">Your company profile is active. Start posting challenges and reviewing proofs.</p>
+                                </div>
+
+                                <div className="bg-white/60 backdrop-blur-2xl border border-white rounded-[2rem] p-8 shadow-glass space-y-4">
+                                    {companyName && (
+                                        <div className="flex items-center gap-4 p-3 bg-[#F8F9FB] rounded-xl border border-black/5">
+                                            <Building2 className="w-5 h-5 text-[#1C1C1E]/30" />
+                                            <div>
+                                                <p className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30">Company</p>
+                                                <p className="font-semibold text-sm">{companyName}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {industry && (
+                                        <div className="flex items-center gap-4 p-3 bg-[#F8F9FB] rounded-xl border border-black/5">
+                                            <Zap className="w-5 h-5 text-[#1C1C1E]/30" />
+                                            <div>
+                                                <p className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30">Industry</p>
+                                                <p className="font-semibold text-sm">{industry}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {companySize && (
+                                        <div className="flex items-center gap-4 p-3 bg-[#F8F9FB] rounded-xl border border-black/5">
+                                            <Users className="w-5 h-5 text-[#1C1C1E]/30" />
+                                            <div>
+                                                <p className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30">Size</p>
+                                                <p className="font-semibold text-sm">{companySize} employees</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {website && (
+                                        <div className="flex items-center gap-4 p-3 bg-[#F8F9FB] rounded-xl border border-black/5">
+                                            <Globe className="w-5 h-5 text-[#1C1C1E]/30" />
+                                            <div>
+                                                <p className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30">Website</p>
+                                                <p className="font-semibold text-sm">{website}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Navigation — same as candidate onboarding */}
+                    <div className="flex items-center justify-between mt-10 max-w-2xl mx-auto">
+                        {step > 1 ? (
+                            <button onClick={() => setStep(step - 1)} className="flex items-center gap-2 text-sm text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-colors font-medium">
+                                <ArrowLeft className="w-4 h-4" /> Back
+                            </button>
+                        ) : <div />}
+
+                        {step < totalSteps ? (
+                            <button
+                                onClick={() => canProceed() && setStep(step + 1)}
+                                disabled={!canProceed()}
+                                className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-base transition-all ${canProceed() ? 'bg-[#1C1C1E] text-white hover:bg-[#1C1C1E]/80' : 'bg-black/5 text-[#1C1C1E]/20 cursor-not-allowed'}`}
+                            >
+                                Continue <ArrowRight className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleFinish}
+                                disabled={saving}
+                                className="flex items-center gap-2 bg-[#1C1C1E] text-white px-8 py-4 rounded-2xl font-bold text-base hover:bg-[#1C1C1E]/80 transition-all disabled:opacity-50"
+                            >
+                                {saving ? (
+                                    <><Loader2 className="w-5 h-5 animate-spin" /> Saving Profile...</>
+                                ) : (
+                                    <>Enter Dashboard <ArrowRight className="w-5 h-5" /></>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                    {saveError && (
+                        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-medium">
+                            {saveError}
+                        </div>
                     )}
-                </AnimatePresence>
-
-                {/* CTA Button */}
-                <motion.button
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98, y: 0 }}
-                    onClick={handleNext}
-                    className="w-full bg-[#1C1C1E] text-white py-6 rounded-3xl font-black text-xs tracking-[0.2em] uppercase mt-8 shadow-xl flex items-center justify-center gap-3 transition-colors hover:bg-proof-accent"
-                >
-                    {step === 3 ? "Enter Dashboard" : "Continue"}
-                    <ArrowRight size={16} strokeWidth={3} />
-                </motion.button>
-
-                <p className="text-center mt-8 text-[10px] font-bold text-[#1C1C1E]/30 uppercase tracking-[0.3em]">
-                    Proof for Business &middot; Secure & Verified
-                </p>
+                </div>
             </div>
         </div>
     );
