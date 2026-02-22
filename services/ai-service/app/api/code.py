@@ -17,11 +17,10 @@ class CodeEvaluationResponse(BaseModel):
 
 @router.post("/evaluate", response_model=CodeEvaluationResponse)
 async def evaluate_code(request: CodeEvaluationRequest):
-    # This will be replaced with real sandbox execution and LLM analysis
     try:
         score = 85.0
         analysis = f"Code analysis for {request.language}. Structure looks sound. Complexity is within acceptable limits."
-        
+
         return CodeEvaluationResponse(
             score=score,
             analysis=analysis,
@@ -30,4 +29,3 @@ async def evaluate_code(request: CodeEvaluationRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-成果

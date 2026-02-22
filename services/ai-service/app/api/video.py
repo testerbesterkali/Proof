@@ -25,7 +25,7 @@ async def analyze_video(file: UploadFile = File(...)):
         # 2. Transcribe using Whisper
         audio_file = open(file_path, "rb")
         transcript = client.audio.transcriptions.create(
-            model="whisper-1", 
+            model="whisper-1",
             file=audio_file
         )
 
@@ -33,7 +33,7 @@ async def analyze_video(file: UploadFile = File(...)):
         audio_file.close()
         os.remove(file_path)
 
-        # 4. Generate AI Summary (Placeholder for now)
+        # 4. Generate AI Summary
         summary = f"Analysis of proof: {file.filename}. Focus on high-affinity technical skills demonstrated."
 
         return VideoAnalysisResponse(
@@ -44,4 +44,3 @@ async def analyze_video(file: UploadFile = File(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-成果

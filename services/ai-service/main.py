@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from app.api.video import router as video_router
 from app.api.code import router as code_router
 from app.api.matching import router as matching_router
+from app.api.fraud import router as fraud_router
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ app = FastAPI(
 app.include_router(video_router)
 app.include_router(code_router)
 app.include_router(matching_router)
+app.include_router(fraud_router)
 
 # CORS Configuration
 app.add_middleware(
@@ -39,4 +41,3 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-成果
