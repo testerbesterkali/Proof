@@ -83,16 +83,17 @@ export function ConnectedAccounts() {
     const handleConnect = async (account: AccountConfig) => {
         if (!account.provider) return;
         setConnecting(account.id);
+        const redirect = window.location.origin + '/settings/accounts';
         try {
             switch (account.provider) {
                 case 'google':
-                    await signInWithGoogle();
+                    await signInWithGoogle(redirect);
                     break;
                 case 'github':
-                    await signInWithGitHub();
+                    await signInWithGitHub(redirect);
                     break;
                 case 'linkedin_oidc':
-                    await signInWithLinkedIn();
+                    await signInWithLinkedIn(redirect);
                     break;
             }
         } catch (err) {

@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { SuggestionInput } from '../components/SuggestionInput';
+import { jobTitleSuggestions, locationSuggestions, allSkillSuggestions, salarySuggestions } from '../data/suggestions';
 import {
     User, ArrowRight, ArrowLeft, MapPin, Briefcase, Code, Palette, BarChart3,
     PenTool, Megaphone, Database, Globe, Camera, CheckCircle, Zap,
@@ -24,7 +26,11 @@ const experienceLevels = ['0-1 years', '1-3 years', '3-5 years', '5-10 years', '
 
 export function CandidateOnboarding() {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1);
+    const [searchParams] = useSearchParams();
+    const [step, setStep] = useState(() => {
+        const s = parseInt(searchParams.get('step') || '1');
+        return s >= 1 && s <= 4 ? s : 1;
+    });
     const totalSteps = 4;
 
     // Step 1 — Profile basics
@@ -46,18 +52,20 @@ export function CandidateOnboarding() {
     const [linkedinConnected, setLinkedinConnected] = useState(false);
 
     // Auth
-    const { user, signInWithLinkedIn, linkedProviders } = useAuth();
+    const { user, signInWithLinkedIn, signInWithGitHub, linkedProviders } = useAuth();
 
     // Sync LinkedIn connected state from auth
     useEffect(() => {
         if (linkedProviders.includes('linkedin_oidc')) {
             setLinkedinConnected(true);
-            // Auto-fill from LinkedIn profile data if we just connected
             if (user?.user_metadata?.full_name && !autoFilled) {
                 setHeadline(user.user_metadata.full_name || '');
                 setAutoFilled(true);
                 setAutoFillSource('linkedin');
             }
+        }
+        if (linkedProviders.includes('github')) {
+            setGithubConnected(true);
         }
     }, [linkedProviders, user]);
 
@@ -260,7 +268,7 @@ export function CandidateOnboarding() {
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        signInWithLinkedIn(window.location.origin + '/onboarding/candidate');
+                                                        signInWithLinkedIn(window.location.origin + '/onboarding/candidate?step=1');
                                                     }}
                                                     className="flex-1 flex items-center justify-center gap-2 bg-[#0077B5] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#006097] transition-colors"
                                                 >
@@ -286,26 +294,23 @@ export function CandidateOnboarding() {
                                 <div className="bg-white/60 backdrop-blur-2xl border border-white rounded-[2rem] p-8 shadow-glass space-y-5">
                                     <div>
                                         <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Professional Headline</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Senior Frontend Engineer"
+                                        <SuggestionInput
                                             value={headline}
-                                            onChange={e => setHeadline(e.target.value)}
-                                            className="w-full bg-[#F8F9FB] border border-black/5 rounded-xl py-4 px-5 text-[#1C1C1E] placeholder-[#1C1C1E]/25 focus:outline-none focus:border-[#1C1C1E]/15 transition-colors text-base"
+                                            onChange={setHeadline}
+                                            suggestions={jobTitleSuggestions}
+                                            placeholder="e.g. Senior Frontend Engineer"
+                                            className="text-base"
                                         />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Location</label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#1C1C1E]/25" />
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. San Francisco, CA"
-                                                value={location}
-                                                onChange={e => setLocation(e.target.value)}
-                                                className="w-full bg-[#F8F9FB] border border-black/5 rounded-xl py-4 pl-12 pr-5 text-[#1C1C1E] placeholder-[#1C1C1E]/25 focus:outline-none focus:border-[#1C1C1E]/15 transition-colors"
-                                            />
-                                        </div>
+                                        <SuggestionInput
+                                            value={location}
+                                            onChange={setLocation}
+                                            suggestions={locationSuggestions}
+                                            placeholder="e.g. San Francisco, CA"
+                                            icon={<MapPin className="w-5 h-5" />}
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Experience Level</label>
@@ -337,6 +342,35 @@ export function CandidateOnboarding() {
                                 </div>
 
                                 <div className="space-y-6">
+                                    {/* Skill search bar */}
+                                    <div className="bg-white/60 border border-white rounded-2xl p-6 shadow-glass relative z-10 overflow-visible">
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-3">Search & Add Skills</label>
+                                        <SuggestionInput
+                                            value=""
+                                            onChange={(skill) => {
+                                                if (skill.trim() && !selectedSkills.includes(skill)) {
+                                                    setSelectedSkills(prev => [...prev, skill]);
+                                                }
+                                            }}
+                                            suggestions={allSkillSuggestions.filter(s => !selectedSkills.includes(s))}
+                                            placeholder="Type to search skills... (e.g. React, Python, Figma)"
+                                            maxSuggestions={8}
+                                            clearOnSelect
+                                        />
+                                        {selectedSkills.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-4">
+                                                {selectedSkills.map(skill => (
+                                                    <span key={skill} className="inline-flex items-center gap-1.5 bg-[#1C1C1E] text-white pl-3 pr-2 py-1.5 rounded-lg text-sm font-medium">
+                                                        {skill}
+                                                        <button onClick={() => setSelectedSkills(prev => prev.filter(s => s !== skill))} className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/40 transition-colors">
+                                                            <span className="text-[10px] leading-none">✕</span>
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {skillCategories.map(cat => (
                                         <div key={cat.label} className="bg-white/60 backdrop-blur-2xl border border-white rounded-2xl p-6 shadow-glass">
                                             <div className="flex items-center gap-2 mb-4">
@@ -409,16 +443,13 @@ export function CandidateOnboarding() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Min Salary (USD)</label>
-                                            <div className="relative">
-                                                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#1C1C1E]/25" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. 80,000"
-                                                    value={salaryMin}
-                                                    onChange={e => setSalaryMin(e.target.value)}
-                                                    className="w-full bg-[#F8F9FB] border border-black/5 rounded-xl py-4 pl-12 pr-5 text-[#1C1C1E] placeholder-[#1C1C1E]/25 focus:outline-none focus:border-[#1C1C1E]/15 transition-colors"
-                                                />
-                                            </div>
+                                            <SuggestionInput
+                                                value={salaryMin}
+                                                onChange={setSalaryMin}
+                                                suggestions={salarySuggestions}
+                                                placeholder="e.g. 80,000"
+                                                icon={<DollarSign className="w-5 h-5" />}
+                                            />
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Work Mode</label>
@@ -455,8 +486,12 @@ export function CandidateOnboarding() {
 
                                 <div className="space-y-4">
                                     <button
-                                        onClick={() => setGithubConnected(!githubConnected)}
-                                        className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${githubConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10'}`}
+                                        onClick={() => {
+                                            if (!githubConnected) {
+                                                signInWithGitHub(window.location.origin + '/onboarding/candidate?step=4');
+                                            }
+                                        }}
+                                        className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${githubConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10 cursor-pointer'}`}
                                     >
                                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${githubConnected ? 'bg-green-100' : 'bg-[#F8F9FB]'}`}>
                                             <Github className={`w-7 h-7 ${githubConnected ? 'text-green-600' : 'text-[#1C1C1E]'}`} />
@@ -468,14 +503,14 @@ export function CandidateOnboarding() {
                                         {githubConnected ? (
                                             <span className="text-sm font-bold text-green-600 flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Connected</span>
                                         ) : (
-                                            <span className="text-sm font-bold text-[#1C1C1E]/30">Connect →</span>
+                                            <span className="text-sm font-bold text-[#1C1C1E]">Connect →</span>
                                         )}
                                     </button>
 
                                     <button
                                         onClick={() => {
                                             if (!linkedinConnected) {
-                                                signInWithLinkedIn(window.location.origin + '/onboarding/candidate');
+                                                signInWithLinkedIn(window.location.origin + '/onboarding/candidate?step=4');
                                             }
                                         }}
                                         className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${linkedinConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10 cursor-pointer'}`}
