@@ -169,7 +169,7 @@ export function Dashboard() {
                 </section>
 
                 {/* FILTERS & LIST */}
-                <section className="mt-auto pt-10">
+                <section className="mt-auto pt-1">
                     <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-4">
                             <div className="w-4 h-4" /> {/* Spacer */}
