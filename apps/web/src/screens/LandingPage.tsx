@@ -36,7 +36,7 @@ export function LandingPage() {
                         <a href="#how-it-works" className="hover:text-[#1C1C1E] transition-colors">How It Works</a>
                         <a href="#testimonials" className="hover:text-[#1C1C1E] transition-colors">Testimonials</a>
                         <Link to="/signup" className="hover:text-[#1C1C1E] transition-colors">Sign Up</Link>
-                        <Link to="/dashboard" className="px-5 py-2.5 bg-[#1C1C1E] text-white rounded-full font-semibold hover:bg-[#1C1C1E]/80 transition-colors text-sm">
+                        <Link to="/login" className="px-5 py-2.5 bg-[#1C1C1E] text-white rounded-full font-semibold hover:bg-[#1C1C1E]/80 transition-colors text-sm">
                             Login
                         </Link>
                     </div>

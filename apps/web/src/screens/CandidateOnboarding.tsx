@@ -1,6 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import {
     User, ArrowRight, ArrowLeft, MapPin, Briefcase, Code, Palette, BarChart3,
     PenTool, Megaphone, Database, Globe, Camera, CheckCircle, Zap,
@@ -42,6 +44,22 @@ export function CandidateOnboarding() {
     // Step 4 — Connect accounts
     const [githubConnected, setGithubConnected] = useState(false);
     const [linkedinConnected, setLinkedinConnected] = useState(false);
+
+    // Auth
+    const { user, signInWithLinkedIn, linkedProviders } = useAuth();
+
+    // Sync LinkedIn connected state from auth
+    useEffect(() => {
+        if (linkedProviders.includes('linkedin_oidc')) {
+            setLinkedinConnected(true);
+            // Auto-fill from LinkedIn profile data if we just connected
+            if (user?.user_metadata?.full_name && !autoFilled) {
+                setHeadline(user.user_metadata.full_name || '');
+                setAutoFilled(true);
+                setAutoFillSource('linkedin');
+            }
+        }
+    }, [linkedProviders, user]);
 
     // Auto-fill state
     const [isParsing, setIsParsing] = useState(false);
@@ -90,8 +108,83 @@ export function CandidateOnboarding() {
         return true;
     };
 
-    const handleFinish = () => {
-        navigate('/dashboard');
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+
+    const handleFinish = async () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        setSaving(true);
+        setSaveError('');
+
+        try {
+            // 1. Upsert the User row (links Supabase Auth user to our User table)
+            const { error: userError } = await supabase
+                .from('User')
+                .upsert({
+                    id: user.id,
+                    email: user.email || '',
+                    role: 'CANDIDATE',
+                    updatedAt: new Date().toISOString(),
+                }, { onConflict: 'id' });
+
+            if (userError) throw userError;
+
+            // 2. Upsert the CandidateProfile
+            const profileId = crypto.randomUUID();
+
+            // Check if profile already exists for this user
+            const { data: existing } = await supabase
+                .from('CandidateProfile')
+                .select('id')
+                .eq('userId', user.id)
+                .single();
+
+            const profileData = {
+                userId: user.id,
+                headline: headline || null,
+                location: location || null,
+                experience: experience || null,
+                skills: selectedSkills,
+                preferredRoles: preferredRoles,
+                availability: availability || null,
+                preferredSalary: salaryMin ? parseInt(salaryMin.replace(/,/g, '')) : null,
+                remote,
+                githubUrl: githubConnected ? 'connected' : null,
+                linkedinUrl: linkedinConnected ? 'connected' : null,
+                onboardingCompleted: true,
+                updatedAt: new Date().toISOString(),
+            };
+
+            if (existing?.id) {
+                // Update existing
+                const { error: profileError } = await supabase
+                    .from('CandidateProfile')
+                    .update(profileData)
+                    .eq('id', existing.id);
+                if (profileError) throw profileError;
+            } else {
+                // Insert new
+                const { error: profileError } = await supabase
+                    .from('CandidateProfile')
+                    .insert({
+                        id: profileId,
+                        ...profileData,
+                        createdAt: new Date().toISOString(),
+                    });
+                if (profileError) throw profileError;
+            }
+
+            navigate('/dashboard');
+        } catch (err: any) {
+            console.error('Save error:', err);
+            setSaveError(err.message || 'Failed to save profile. Please try again.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -99,7 +192,7 @@ export function CandidateOnboarding() {
             {/* Header */}
             <div className="px-8 pt-8 pb-4 flex items-center justify-between">
                 <Link to="/" className="text-2xl font-bold">proof<span className="text-proof-accent">.</span></Link>
-                <button onClick={() => navigate('/dashboard')} className="text-sm text-[#1C1C1E]/40 font-medium hover:text-[#1C1C1E] transition-colors">
+                <button onClick={handleFinish} className="text-sm text-[#1C1C1E]/40 font-medium hover:text-[#1C1C1E] transition-colors">
                     Skip for now →
                 </button>
             </div>
@@ -166,7 +259,9 @@ export function CandidateOnboarding() {
                                                     <FileUp className="w-4 h-4" /> Upload Resume
                                                 </button>
                                                 <button
-                                                    onClick={() => simulateAutoFill('linkedin')}
+                                                    onClick={() => {
+                                                        signInWithLinkedIn(window.location.origin + '/onboarding/candidate');
+                                                    }}
                                                     className="flex-1 flex items-center justify-center gap-2 bg-[#0077B5] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#006097] transition-colors"
                                                 >
                                                     <Linkedin className="w-4 h-4" /> Import LinkedIn
@@ -378,8 +473,12 @@ export function CandidateOnboarding() {
                                     </button>
 
                                     <button
-                                        onClick={() => setLinkedinConnected(!linkedinConnected)}
-                                        className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${linkedinConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10'}`}
+                                        onClick={() => {
+                                            if (!linkedinConnected) {
+                                                signInWithLinkedIn(window.location.origin + '/onboarding/candidate');
+                                            }
+                                        }}
+                                        className={`w-full bg-white/60 backdrop-blur-2xl border rounded-2xl p-6 shadow-glass flex items-center gap-5 transition-all ${linkedinConnected ? 'border-green-200 bg-green-50/30' : 'border-white hover:border-black/10 cursor-pointer'}`}
                                     >
                                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${linkedinConnected ? 'bg-green-100' : 'bg-[#F8F9FB]'}`}>
                                             <Linkedin className={`w-7 h-7 ${linkedinConnected ? 'text-green-600' : 'text-[#0077B5]'}`} />
@@ -391,7 +490,7 @@ export function CandidateOnboarding() {
                                         {linkedinConnected ? (
                                             <span className="text-sm font-bold text-green-600 flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Connected</span>
                                         ) : (
-                                            <span className="text-sm font-bold text-[#1C1C1E]/30">Connect →</span>
+                                            <span className="text-sm font-bold text-[#0077B5]">Connect →</span>
                                         )}
                                     </button>
 
@@ -430,12 +529,22 @@ export function CandidateOnboarding() {
                         ) : (
                             <button
                                 onClick={handleFinish}
-                                className="flex items-center gap-2 bg-[#1C1C1E] text-white px-8 py-4 rounded-2xl font-bold text-base hover:bg-[#1C1C1E]/80 transition-all"
+                                disabled={saving}
+                                className="flex items-center gap-2 bg-[#1C1C1E] text-white px-8 py-4 rounded-2xl font-bold text-base hover:bg-[#1C1C1E]/80 transition-all disabled:opacity-50"
                             >
-                                Go to Dashboard <ArrowRight className="w-5 h-5" />
+                                {saving ? (
+                                    <><Loader2 className="w-5 h-5 animate-spin" /> Saving Profile...</>
+                                ) : (
+                                    <>Go to Dashboard <ArrowRight className="w-5 h-5" /></>
+                                )}
                             </button>
                         )}
                     </div>
+                    {saveError && (
+                        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-medium">
+                            {saveError}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -6,9 +6,11 @@ interface AuthContextType {
     user: User | null;
     session: Session | null;
     loading: boolean;
-    signInWithGoogle: () => Promise<void>;
-    signInWithGitHub: () => Promise<void>;
-    signInWithLinkedIn: () => Promise<void>;
+    signUpWithEmail: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+    signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
+    signInWithGoogle: (redirectTo?: string) => Promise<void>;
+    signInWithGitHub: (redirectTo?: string) => Promise<void>;
+    signInWithLinkedIn: (redirectTo?: string) => Promise<void>;
     signOut: () => Promise<void>;
     linkedProviders: string[];
 }
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session?.user) {
                 extractLinkedProviders(session.user);
             }
+            setLoading(false);
         });
 
         return () => subscription.unsubscribe();
@@ -51,7 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (user.app_metadata?.provider) {
             providers.push(user.app_metadata.provider);
         }
-        // Also check identities
         if (user.identities) {
             user.identities.forEach(identity => {
                 if (!providers.includes(identity.provider)) {
@@ -62,30 +64,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLinkedProviders(providers);
     };
 
-    const signInWithGoogle = async () => {
+    const signUpWithEmail = async (email: string, password: string, name: string) => {
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: { full_name: name },
+            },
+        });
+        return { error: error?.message || null };
+    };
+
+    const signInWithEmail = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        return { error: error?.message || null };
+    };
+
+    const signInWithGoogle = async (redirectTo?: string) => {
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin + '/settings/accounts',
+                redirectTo: redirectTo || window.location.origin + '/dashboard',
             },
         });
     };
 
-    const signInWithGitHub = async () => {
+    const signInWithGitHub = async (redirectTo?: string) => {
         await supabase.auth.signInWithOAuth({
             provider: 'github',
             options: {
-                redirectTo: window.location.origin + '/settings/accounts',
+                redirectTo: redirectTo || window.location.origin + '/dashboard',
                 scopes: 'read:user user:email',
             },
         });
     };
 
-    const signInWithLinkedIn = async () => {
+    const signInWithLinkedIn = async (redirectTo?: string) => {
         await supabase.auth.signInWithOAuth({
             provider: 'linkedin_oidc',
             options: {
-                redirectTo: window.location.origin + '/settings/accounts',
+                redirectTo: redirectTo || window.location.origin + '/dashboard',
             },
         });
     };
@@ -100,6 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user,
             session,
             loading,
+            signUpWithEmail,
+            signInWithEmail,
             signInWithGoogle,
             signInWithGitHub,
             signInWithLinkedIn,
