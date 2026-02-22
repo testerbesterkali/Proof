@@ -9,6 +9,7 @@ import { EmployerDashboard } from './screens/EmployerDashboard';
 import { ChallengeCreation } from './screens/ChallengeCreation';
 import { ChallengeInterface } from './screens/ChallengeInterface';
 import { SubmissionReview } from './screens/SubmissionReview';
+import { Messages } from './screens/Messages';
 
 const queryClient = new QueryClient();
 
