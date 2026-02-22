@@ -11,6 +11,7 @@
         "forceConsistentCasingInFileNames": true,
         "moduleResolution": "bundler",
         "isolatedModules": true,
+        "resolveJsonModule": true,
         "incremental": true
     }
 }

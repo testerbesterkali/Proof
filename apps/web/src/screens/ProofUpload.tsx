@@ -1,21 +1,35 @@
-import React, { useState, useRef } from 'react';
+import * as React from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Search, Mail, Briefcase, Inbox, Users, Video, Mic, StopCircle, RefreshCcw, Check, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 export function ProofUpload() {
     const [recording, setRecording] = useState(false);
     const [timeLeft, setTimeLeft] = useState(90);
+    const [stream, setStream] = useState<MediaStream | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
 
+    useEffect(() => {
+        return () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [stream]);
+
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            setStream(mediaStream);
             if (videoRef.current) {
-                videoRef.current.srcObject = stream;
+                videoRef.current.srcObject = mediaStream;
             }
 
-            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
             mediaRecorderRef.current = mediaRecorder;
             chunksRef.current = [];
 
@@ -27,12 +41,12 @@ export function ProofUpload() {
 
             mediaRecorder.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-                console.log('Video ready to upload to S3', blob);
-                // Upload logic here directly via signed URL S3 integration
+                setPreviewUrl(URL.createObjectURL(blob));
             };
 
             mediaRecorder.start(1000);
             setRecording(true);
+            setTimeLeft(90);
 
             const timer = setInterval(() => {
                 setTimeLeft((prev) => {
@@ -45,7 +59,6 @@ export function ProofUpload() {
                 });
             }, 1000);
 
-            // Store timer to clear it if unmounted?
             (window as any)._proofUploadTimer = timer;
 
         } catch (err) {
@@ -56,8 +69,7 @@ export function ProofUpload() {
     const stopRecording = () => {
         if (mediaRecorderRef.current && recording) {
             mediaRecorderRef.current.stop();
-            if (videoRef.current && videoRef.current.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
+            if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
             setRecording(false);
@@ -67,48 +79,173 @@ export function ProofUpload() {
 
     return (
         <ErrorBoundary>
-            <div className="max-w-4xl mx-auto p-8 h-full">
-                <header className="mb-8">
-                    <h1 className="text-3xl font-heading font-bold text-cloud mb-2">Record Video Proof</h1>
-                    <p className="text-cloud/60">Upload a 90-second explanation of your recent project.</p>
-                </header>
+            <div className="w-full min-h-screen flex text-[#1C1C1E] bg-[#E4E5E7] font-sans">
 
-                <div className="bg-[#020c1b] rounded-2xl overflow-hidden border border-[#112240] aspect-video relative">
-                    <video
-                        ref={videoRef}
-                        className="w-full h-full object-cover bg-black"
-                        autoPlay
-                        muted
-                        playsInline
-                    />
-
-                    <div className="absolute top-6 right-6 flex items-center gap-3">
-                        {recording && (
-                            <div className="flex items-center gap-2 bg-black/50 backdrop-blur px-3 py-1 rounded-full text-white font-mono">
-                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                0:{timeLeft.toString().padStart(2, '0')}
-                            </div>
-                        )}
+                {/* LEFT SIDEBAR (Consistent with Dashboard) */}
+                <aside className="w-24 fixed h-full flex flex-col items-center py-8 z-20">
+                    <div className="mb-16 flex items-center justify-center relative">
+                        <div className="w-12 h-12 rounded-full bg-[#FF6B52] flex items-center justify-center text-white font-bold text-xl relative z-10">
+                            P
+                        </div>
                     </div>
-                </div>
+                    <nav className="flex flex-col gap-8">
+                        {[Search, Mail, Briefcase, Inbox, Users].map((Icon, i) => (
+                            <button key={i} className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#1C1C1E]/30 hover:text-[#1C1C1E] transition-all">
+                                <Icon size={20} strokeWidth={2} />
+                            </button>
+                        ))}
+                    </nav>
+                </aside>
 
-                <div className="mt-8 flex justify-center gap-4">
-                    {!recording ? (
-                        <button
-                            onClick={startRecording}
-                            className="px-8 py-3 bg-electric text-navy font-bold rounded-full hover:opacity-90 transition-opacity shadow-lg shadow-electric/20"
+                <main className="flex-1 ml-24 pl-8 pr-12 pt-8 flex flex-col relative min-h-screen">
+
+                    <header className="flex items-center justify-between mb-12">
+                        <div>
+                            <h1 className="text-4xl font-medium tracking-tight mb-2">Record Proof</h1>
+                            <p className="text-[#1C1C1E]/40 text-sm">Demonstrate your skills in a 90-second video elevator pitch.</p>
+                        </div>
+
+                        <div className="bg-white/50 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-4 shadow-glass border border-white/20">
+                            <div className="flex -space-x-2">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-proof-bg overflow-hidden">
+                                        <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="User" />
+                                    </div>
+                                ))}
+                            </div>
+                            <span className="text-[10px] font-bold text-[#1C1C1E]/60 uppercase tracking-wider">Recently Uploaded</span>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 flex flex-col items-center justify-center pb-20">
+
+                        {/* RECORDING CONTAINER */}
+                        <motion.div
+                            layout
+                            className="w-full max-w-4xl bg-white/40 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 shadow-glass relative overflow-hidden"
                         >
-                            Start Recording
-                        </button>
-                    ) : (
-                        <button
-                            onClick={stopRecording}
-                            className="px-8 py-3 bg-red-500 text-white font-bold rounded-full hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
-                        >
-                            Stop Recording
-                        </button>
-                    )}
-                </div>
+                            <div className="aspect-video bg-black rounded-[1.8rem] overflow-hidden relative shadow-inner">
+                                {previewUrl && !recording ? (
+                                    <video src={previewUrl} controls className="w-full h-full object-cover" />
+                                ) : (
+                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover opacity-90" />
+                                )}
+
+                                {/* OVERLAYS */}
+                                <AnimatePresence>
+                                    {recording && (
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="absolute inset-0 pointer-events-none"
+                                        >
+                                            <div className="absolute top-8 left-8 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur rounded-full text-white text-xs font-mono">
+                                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                                REC 0:{timeLeft.toString().padStart(2, '0')}
+                                            </div>
+
+                                            <div className="absolute top-8 right-8 text-white/50 text-[10px] font-bold uppercase tracking-[0.2em]">
+                                                1080p 60fps
+                                            </div>
+
+                                            {/* GUIDELINE FRAME */}
+                                            <div className="absolute inset-12 border border-white/10 rounded-2xl pointer-events-none flex items-center justify-center">
+                                                <div className="w-px h-12 bg-white/5 absolute top-0" />
+                                                <div className="w-px h-12 bg-white/5 absolute bottom-0" />
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {!recording && !previewUrl && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+                                        <div className="text-white text-center">
+                                            <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur mb-4 mx-auto flex items-center justify-center border border-white/20">
+                                                <Video className="text-white/60" size={32} />
+                                            </div>
+                                            <p className="text-sm font-medium">Camera preview will appear here</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* CONTROLS BAR */}
+                            <div className="mt-4 flex items-center justify-between px-4 py-2">
+                                <div className="flex items-center gap-6">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-bold text-[#1C1C1E]/30 uppercase tracking-widest">Mic Status</span>
+                                        <div className="flex gap-1 mt-1">
+                                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                                <div key={i} className={`w-1 h-3 rounded-full ${recording ? 'bg-[#FF6B52] animate-bounce' : 'bg-[#1C1C1E]/10'}`} style={{ animationDelay: `${i * 0.1}s` }} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    {!recording && previewUrl && (
+                                        <button
+                                            onClick={() => { setPreviewUrl(null); startRecording(); }}
+                                            className="w-12 h-12 rounded-full border border-[#1C1C1E]/10 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] hover:bg-white transition-all"
+                                        >
+                                            <RefreshCcw size={20} />
+                                        </button>
+                                    )}
+
+                                    {!recording ? (
+                                        <button
+                                            onClick={startRecording}
+                                            className="group flex items-center justify-center bg-[#FF6B52] text-white p-2 rounded-full shadow-lg shadow-[#FF6B52]/20 hover:scale-105 transition-transform"
+                                        >
+                                            <div className="bg-white/20 p-4 rounded-full">
+                                                <Video size={28} />
+                                            </div>
+                                            <span className="px-6 font-bold text-lg">Start Recording</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={stopRecording}
+                                            className="group flex items-center justify-center bg-[#1C1C1E] text-white p-2 rounded-full shadow-lg hover:scale-105 transition-transform"
+                                        >
+                                            <div className="bg-white/10 p-4 rounded-full">
+                                                <StopCircle size={28} />
+                                            </div>
+                                            <span className="px-6 font-bold text-lg">Stop Recording</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="w-32 flex justify-end">
+                                    {previewUrl && !recording && (
+                                        <button className="flex items-center gap-2 bg-[#1C1C1E] text-white px-6 py-3 rounded-full font-bold shadow-soft hover:opacity-90 transition-opacity">
+                                            Confirm <ArrowRight size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+
+                        {/* TIPS SECTION */}
+                        <div className="mt-12 w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {[
+                                { title: "Eye Contact", desc: "Look directly at the lens to build trust." },
+                                { title: "Clarity", desc: "Keep it under 90s. Focus on impact." },
+                                { title: "Lighting", desc: "Ensure your face is well lit from front." }
+                            ].map((tip, i) => (
+                                <div key={i} className="bg-white/40 p-6 rounded-3xl border border-white/60 shadow-inner-soft">
+                                    <h4 className="font-bold text-xs uppercase tracking-widest text-[#FF6B52] mb-2">{tip.title}</h4>
+                                    <p className="text-sm text-[#1C1C1E]/60 font-medium">{tip.desc}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                    </div>
+                </main>
+
+                {/* FLOATING DECORATIONS */}
+                <div className="fixed -bottom-20 -right-20 w-80 h-80 bg-[#FF6B52]/5 blur-3xl rounded-full" />
+                <div className="fixed -top-20 -left-20 w-80 h-80 bg-[#FF6B52]/3 blur-3xl rounded-full" />
             </div>
         </ErrorBoundary>
     );

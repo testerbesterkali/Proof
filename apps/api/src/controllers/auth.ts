@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import '@fastify/cookie';
 import { prisma } from '../utils/prisma';
 import z from 'zod';
 

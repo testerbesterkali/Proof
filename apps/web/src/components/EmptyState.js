@@ -1,0 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export function EmptyState({ title, description, actionText, onAction }) {
+    return (_jsxs("div", { className: "flex flex-col items-center justify-center p-12 text-center rounded-2xl border-2 border-dashed border-[#112240]/50 bg-[#020c1b]/30", children: [_jsx("div", { className: "p-4 bg-[#112240] rounded-full mb-4", children: _jsx("div", { className: "w-8 h-8 opacity-50" }) }), _jsx("h3", { className: "text-xl font-heading font-semibold text-cloud mb-2", children: title }), _jsx("p", { className: "text-cloud/60 max-w-sm mb-6", children: description }), actionText && onAction && (_jsx("button", { onClick: onAction, className: "px-6 py-2 bg-electric text-navy font-semibold rounded-lg hover:opacity-90 transition-opacity", children: actionText }))] }));
+}
