@@ -14,6 +14,8 @@ import { EmployerOnboarding } from './screens/EmployerOnboarding';
 import { EmployerDashboard } from './screens/EmployerDashboard';
 import { ChallengeCreation } from './screens/ChallengeCreation';
 import { SubmissionReview } from './screens/SubmissionReview';
+import { CandidateOnboarding } from './screens/CandidateOnboarding';
+import { ConnectedAccounts } from './screens/ConnectedAccounts';
 
 const queryClient = new QueryClient();
 
@@ -25,6 +27,7 @@ export default function App() {
                     {/* Public */}
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/signup" element={<Signup />} />
+                    <Route path="/onboarding/candidate" element={<CandidateOnboarding />} />
 
                     {/* Candidate */}
                     <Route path="/dashboard" element={<Dashboard />} />
@@ -34,6 +37,7 @@ export default function App() {
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/applications" element={<ApplicationTracker />} />
                     <Route path="/messages" element={<Messages />} />
+                    <Route path="/settings/accounts" element={<ConnectedAccounts />} />
 
                     {/* Employer */}
                     <Route path="/employer/onboarding" element={<EmployerOnboarding />} />
