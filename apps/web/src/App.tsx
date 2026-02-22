@@ -18,6 +18,9 @@ import { CandidateOnboarding } from './screens/CandidateOnboarding';
 import { ConnectedAccounts } from './screens/ConnectedAccounts';
 import { AuthCallback } from './screens/AuthCallback';
 import { Login } from './screens/Login';
+import { EmployerChallenges } from './screens/EmployerChallenges';
+import { EmployerSubmissions } from './screens/EmployerSubmissions';
+import { EmployerMessages } from './screens/EmployerMessages';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -49,6 +52,9 @@ export default function App() {
 
                         {/* Employer — Protected */}
                         <Route path="/employer/dashboard" element={<ProtectedRoute><EmployerDashboard /></ProtectedRoute>} />
+                        <Route path="/employer/challenges" element={<ProtectedRoute><EmployerChallenges /></ProtectedRoute>} />
+                        <Route path="/employer/submissions" element={<ProtectedRoute><EmployerSubmissions /></ProtectedRoute>} />
+                        <Route path="/employer/messages" element={<ProtectedRoute><EmployerMessages /></ProtectedRoute>} />
                         <Route path="/employer/create-challenge" element={<ProtectedRoute><ChallengeCreation /></ProtectedRoute>} />
                         <Route path="/employer/review/:submissionId" element={<ProtectedRoute><SubmissionReview /></ProtectedRoute>} />
                     </Routes>
