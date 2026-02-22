@@ -26,9 +26,9 @@
         "zod": "^3.22.4"
     },
     "devDependencies": {
-        "@proof/config-eslint": "workspace:*",
-        "@proof/config-typescript": "workspace:*",
-        "@proof/shared-types": "workspace:*",
+        "@proof/config-eslint": "*",
+        "@proof/config-typescript": "*",
+        "@proof/shared-types": "*",
         "@types/node": "^20.11.20",
         "nodemon": "^3.1.0",
         "prisma": "^5.10.2",

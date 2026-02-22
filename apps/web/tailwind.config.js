@@ -8,6 +8,14 @@ export default {
     theme: {
         extend: {
             colors: {
+                proof: {
+                    bg: '#E4E5E7',
+                    card: '#F6F6F6',
+                    text: '#1C1C1E',
+                    accent: '#FF6B52',
+                    accentGradientStart: '#FF9B8A',
+                    border: '#EAEAEA'
+                },
                 navy: {
                     DEFAULT: '#0A192F',
                     light: '#112240',
@@ -17,8 +25,13 @@ export default {
                 cloud: '#F8F9FA'
             },
             fontFamily: {
-                sans: ['"Source Sans Pro"', 'sans-serif'],
-                heading: ['Inter', 'sans-serif']
+                sans: ['"Outfit"', 'sans-serif'],
+                heading: ['"Outfit"', 'sans-serif']
+            },
+            boxShadow: {
+                'soft': '0 20px 40px -15px rgba(0,0,0,0.05)',
+                'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+                'inner-soft': 'inset 0 2px 4px 0 rgba(0,0,0,0.02)',
             }
         },
     },

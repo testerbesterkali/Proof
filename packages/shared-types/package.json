@@ -5,6 +5,6 @@
     "main": "src/index.ts",
     "devDependencies": {
         "typescript": "^5.3.3",
-        "@proof/config-typescript": "workspace:*"
+        "@proof/config-typescript": "*"
     }
 }
