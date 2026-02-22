@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CANDIDATE
+  EMPLOYER
+  ADMIN
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  hashedPassword String?
+  role           Role
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  candidateProfile CandidateProfile?
+  employerProfile  EmployerProfile?
+  messagesSent     Message[]         @relation("Sender")
+  messagesReceived Message[]         @relation("Receiver")
+}
+
+model CandidateProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  headline        String?
+  bio             String?
+  availability    String?  // ACTIVELY_LOOKING, OPEN, NOT_AVAILABLE
+  preferredRole   String?
+  preferredSalary Int?
+  githubUrl       String?
+  linkedinUrl     String?
+  
+  proofs          Proof[]
+  submissions     Submission[]
+  receivedEndorsements Endorsement[] @relation("Endorsee")
+  givenEndorsements    Endorsement[] @relation("Endorser")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model EmployerProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  companyName     String
+  industry        String?
+  companySize     String?
+  verifiedUrl     String?
+  isVerified      Boolean  @default(false)
+
+  challenges      Challenge[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum ProofType {
+  VIDEO
+  LIVE_TASK
+  WORK_SAMPLE
+  PEER_ENDORSEMENT
+}
+
+model Proof {
+  id                 String           @id @default(uuid())
+  candidateId        String
+  candidate          CandidateProfile @relation(fields: [candidateId], references: [id])
+  title              String
+  description        String?
+  type               ProofType
+  assetUrl           String?
+  skillTags          String[]
+  isFeatured         Boolean          @default(false)
+  views              Int              @default(0)
+  
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model Endorsement {
+  id            String           @id @default(uuid())
+  endorserId    String
+  endorser      CandidateProfile @relation("Endorser", fields: [endorserId], references: [id])
+  endorseeId    String
+  endorsee      CandidateProfile @relation("Endorsee", fields: [endorseeId], references: [id])
+  skill         String
+  reviewText    String
+  isVerified    Boolean          @default(false)
+
+  createdAt     DateTime         @default(now())
+}
+
+model Challenge {
+  id            String          @id @default(uuid())
+  employerId    String
+  employer      EmployerProfile @relation(fields: [employerId], references: [id])
+  title         String
+  description   String
+  type          String          // CODE, DESIGN, WRITING, SALES
+  timeLimitMins Int?
+  prizeAmount   Int             @default(0)
+  isPublic      Boolean         @default(true)
+  status        String          // DRAFT, ACTIVE, CLOSED
+  
+  submissions   Submission[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model Submission {
+  id              String           @id @default(uuid())
+  challengeId     String
+  challenge       Challenge        @relation(fields: [challengeId], references: [id])
+  candidateId     String
+  candidate       CandidateProfile @relation(fields: [candidateId], references: [id])
+  content         String?          // JSON or Text
+  assetUrls       String[]
+  status          String           // SUBMITTED, UNDER_REVIEW, REJECTED, ADVANCED
+  aiScore         Float?
+  employerRating  Int?
+  feedback        String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  sender     User     @relation("Sender", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+  content    String
+  isRead     Boolean  @default(false)
+
+  createdAt  DateTime @default(now())
+}

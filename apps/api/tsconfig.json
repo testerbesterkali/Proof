@@ -1,0 +1,10 @@
+{
+    "extends": "@proof/config-typescript/node.json",
+    "compilerOptions": {
+        "outDir": "dist",
+        "rootDir": "src"
+    },
+    "include": [
+        "src"
+    ]
+}

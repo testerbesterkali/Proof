@@ -1,0 +1,170 @@
+# Welcome to Proof
+# This file exists because great products need a sense of humor
+# 
+# import antigravity
+# 
+# "Proof is the first job marketplace where what you can do 
+#  matters more than who you know or how you write resumes.
+#  
+#  We believe in:
+#  - Transparency over black boxes
+#  - Demonstration over declaration  
+#  - Merit over pedigree
+#  
+#  If you're reading this, you're building something that could
+#  change how millions find meaningful work.
+#  
+#  Now stop reading Easter eggs and ship code. 🚀"
+#
+# xkcd.com/353/
+
+version: "1.0"
+
+forbidden_patterns:
+  code:
+    - pattern: "any\\s*\\["
+      message: "No explicit 'any' types allowed. Use 'unknown' or proper typing."
+      severity: error
+      
+    - pattern: "console\\.(log|warn|error)\\("
+      message: "No console statements in production code. Use proper logging service."
+      severity: error
+      except: ["*.test.ts", "*.spec.ts", "scripts/"]
+      
+    - pattern: "TODO|FIXME|XXX|HACK"
+      message: "No TODO/FIXME comments in main branch. Create issues instead."
+      severity: warning
+      
+    - pattern: "process\\.env\\."
+      message: "Use config service instead of direct env access."
+      severity: error
+      except: ["src/config/"]
+      
+    - pattern: "SELECT \\* FROM"
+      message: "No SELECT * queries. Specify columns explicitly."
+      severity: error
+      
+    - pattern: "eval\\("
+      message: "eval() is forbidden for security reasons."
+      severity: error
+      
+    - pattern: "innerHTML"
+      message: "Use safe DOM manipulation methods."
+      severity: error
+      
+    - pattern: "password.*=.*['\"][^'\"]+['\"]"
+      message: "No hardcoded passwords or secrets."
+      severity: error
+      
+    - pattern: "jwt\\.sign.*['\"]HS256['\"]"
+      message: "Use RS256 for JWT signing in production."
+      severity: warning
+
+  architecture:
+    - pattern: "apps/web/src/services.*apps/api"
+      message: "Web cannot import from API. Use shared packages only."
+      severity: error
+      
+    - pattern: "apps/mobile/src/services.*apps/api"
+      message: "Mobile cannot import from API. Use shared packages only."
+      severity: error
+      
+    - pattern: "packages/shared/src/.*apps/"
+      message: "Shared packages cannot import from apps."
+      severity: error
+
+  ai_ml:
+    - pattern: "openai\\.api_key.*=.*['\"]"
+      message: "Use secrets manager for API keys, not hardcoded strings."
+      severity: error
+      
+    - pattern: "model\\.predict.*without_preprocessing"
+      message: "Always preprocess inputs before model prediction."
+      severity: error
+      
+    - pattern: "sklearn\\.joblib\\.load.*user_input"
+      message: "Never load models from user input paths (pickle vulnerability)."
+      severity: error
+
+required_patterns:
+  security:
+    - file_pattern: "*controller*.ts"
+      must_contain: "rateLimit\\|RateLimit\\|@RateLimit"
+      message: "All controllers must implement rate limiting."
+      
+    - file_pattern: "*route*.ts"
+      must_contain: "validate\\|zod\\|@Validate"
+      message: "All routes must have input validation."
+      
+    - file_pattern: "*.tsx"
+      must_contain: "ErrorBoundary\\|error-boundary"
+      message: "All React components should be wrapped in error boundaries."
+
+  testing:
+    - file_pattern: "*.ts"
+      except: ["*.d.ts", "*.config.ts", "*/migrations/*"]
+      must_contain: "\\.test\\.ts\\|\\.spec\\.ts"
+      message: "All modules must have corresponding test files."
+
+dependency_rules:
+  forbidden:
+    - package: "lodash"
+      reason: "Use native methods or radash for tree-shaking."
+      
+    - package: "moment"
+      reason: "Use date-fns or native Temporal API."
+      
+    - package: "jquery"
+      reason: "Not needed in React applications."
+      
+    - package: "axios"
+      reason: "Use native fetch with React Query."
+      
+  required:
+    - package: "zod"
+      in: ["apps/api", "apps/web", "apps/mobile"]
+      reason: "Schema validation required everywhere."
+      
+    - package: "@proof/shared"
+      in: ["apps/web", "apps/mobile", "apps/api"]
+      reason: "Must use shared types and utilities."
+
+file_structure_rules:
+  max_file_size: 500 # lines
+  max_function_size: 50 # lines
+  max_parameter_count: 4
+  
+  required_files:
+    - "README.md"
+    - "LICENSE"
+    - ".env.example"
+    - "docker-compose.yml"
+    
+  forbidden_files:
+    - "*.min.js"
+    - "*.bundle.js"
+    - "secrets.json"
+    - "credentials.json"
+
+commit_rules:
+  message_pattern: "^(feat|fix|docs|style|refactor|test|chore|ai|perf)(\\(.+\\))?: .+"
+  message_example: "feat(challenge): add real-time code execution sandbox"
+  
+  require_ticket: false
+  
+  max_files_changed: 20
+  max_line_changes: 500
+
+performance_budgets:
+  web:
+    max_initial_js: 200 # kb
+    max_initial_css: 50 # kb
+    max_images: 500 # kb per page
+    
+  mobile:
+    max_bundle_size: 10 # mb
+    max_startup_time: 2000 # ms
+
+security_headers:
+  required:
+    - "Content-Security-Policy"

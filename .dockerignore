@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+npm-debug.log
+
+# Git/Docker
+Dockerfile
+.dockerignore
+.git
+.gitignore
+
+# Environment configurations
+.env
+.env.*
+!.env.example
+
+# Docs
+README.md
+
+# Build Outputs
+dist/
+build/
+coverage/
+
+# IDE & OS
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Infrastructure
+terraform/
+*.tfstate
