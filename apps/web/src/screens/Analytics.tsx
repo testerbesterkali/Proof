@@ -31,7 +31,7 @@ export function Analytics() {
 
     return (
         <Layout>
-            <div className="p-8 max-w-7xl mx-auto">
+            <div className="flex-1 flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-10">
                     <div>
@@ -145,25 +145,25 @@ export function Analytics() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="mt-6 bg-gradient-to-r from-[#0A192F] to-[#112240] rounded-2xl p-8 text-white"
+                    className="mt-6 bg-gradient-to-r from-[#1C1C1E] to-[#2C2C2E] rounded-2xl p-8 text-white"
                 >
                     <div className="flex items-center gap-3 mb-4">
-                        <Briefcase className="w-6 h-6 text-[#64FFDA]" />
+                        <Briefcase className="w-6 h-6 text-proof-accent" />
                         <h2 className="font-bold text-lg">Your Benchmark</h2>
                     </div>
-                    <p className="text-gray-400 text-sm mb-6">How you compare to similar candidates on the platform.</p>
+                    <p className="text-white/50 text-sm mb-6">How you compare to similar candidates on the platform.</p>
                     <div className="grid grid-cols-3 gap-8">
                         <div>
-                            <p className="text-3xl font-bold text-[#64FFDA]">Top 12%</p>
-                            <p className="text-sm text-gray-400 mt-1">in Frontend Engineering</p>
+                            <p className="text-3xl font-bold text-proof-accent">Top 12%</p>
+                            <p className="text-sm text-white/40 mt-1">in Frontend Engineering</p>
                         </div>
                         <div>
-                            <p className="text-3xl font-bold text-[#64FFDA]">4.7x</p>
-                            <p className="text-sm text-gray-400 mt-1">more saves than average</p>
+                            <p className="text-3xl font-bold text-proof-accent">4.7x</p>
+                            <p className="text-sm text-white/40 mt-1">more saves than average</p>
                         </div>
                         <div>
-                            <p className="text-3xl font-bold text-[#64FFDA]">2.1x</p>
-                            <p className="text-sm text-gray-400 mt-1">faster response rate</p>
+                            <p className="text-3xl font-bold text-proof-accent">2.1x</p>
+                            <p className="text-sm text-white/40 mt-1">faster response rate</p>
                         </div>
                     </div>
                 </motion.div>

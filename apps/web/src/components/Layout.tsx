@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2 } from 'lucide-react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -12,11 +12,16 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
     const location = useLocation();
 
     const sidebarItems = [
-        { icon: LayoutDashboard, path: '/', label: 'Dashboard' },
+        { icon: LayoutDashboard, path: '/dashboard', label: 'Dashboard' },
         { icon: Briefcase, path: '/challenges', label: 'Challenges' },
-        { icon: Users, path: '/community', label: 'Community' },
+        { icon: Kanban, path: '/applications', label: 'Applications' },
+        { icon: BarChart3, path: '/analytics', label: 'Analytics' },
         { icon: Mail, path: '/messages', label: 'Messages' },
         { icon: Inbox, path: '/upload', label: 'Record Proof' },
+    ];
+
+    const settingsItems = [
+        { icon: Link2, path: '/settings/accounts', label: 'Accounts' },
     ];
 
     const currentPath = location.pathname;
@@ -74,10 +79,45 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
                         );
                     })}
                 </nav>
+
+                {/* Divider */}
+                <div className="w-8 h-px bg-black/5 my-4" />
+
+                {/* Settings links */}
+                <nav className="flex flex-col gap-6">
+                    {settingsItems.map((item, i) => {
+                        const Icon = item.icon;
+                        const isActive = currentPath.startsWith(item.path);
+                        return (
+                            <Link
+                                key={i}
+                                to={item.path}
+                                className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all relative group ${isActive
+                                    ? 'bg-white text-[#1C1C1E] shadow-glass'
+                                    : 'text-[#1C1C1E]/40 hover:text-[#1C1C1E] hover:bg-white/40'
+                                    }`}
+                            >
+                                <Icon size={20} strokeWidth={2.5} />
+                                <AnimatePresence>
+                                    {isActive && (
+                                        <motion.div
+                                            layoutId="sidebarSettingsActive"
+                                            className="absolute left-[-16px] w-1.5 h-6 bg-proof-accent rounded-r-full"
+                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        />
+                                    )}
+                                </AnimatePresence>
+                                <div className="absolute left-16 bg-[#1C1C1E] text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-bold uppercase tracking-widest">
+                                    {item.label}
+                                </div>
+                            </Link>
+                        );
+                    })}
+                </nav>
             </aside>
 
             {/* MAIN CONTENT AREA */}
-            <main className="flex-1 ml-24 pl-8 pr-12 pt-8 flex flex-col relative min-h-screen z-10">
+            <main className="flex-1 ml-24 pl-8 pr-12 pt-8 flex flex-col relative min-h-screen z-10 overflow-y-auto">
                 {/* HEADER BAR */}
                 <header className="flex items-center justify-between mb-8 relative z-10">
                     <motion.div

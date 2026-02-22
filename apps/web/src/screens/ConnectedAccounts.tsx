@@ -104,7 +104,7 @@ export function ConnectedAccounts() {
 
     return (
         <Layout>
-            <div className="p-8 max-w-3xl mx-auto">
+            <div className="flex-1 flex flex-col">
                 {/* Header */}
                 <div className="mb-10">
                     <h1 className="text-3xl font-bold tracking-tight mb-2">Connected Accounts</h1>
