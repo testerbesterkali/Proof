@@ -216,17 +216,17 @@ export function Dashboard() {
                                 <div className="flex gap-8">
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Companies</p>
-                                        <p className="text-lg font-black tracking-tighter">{stats.companies > 0 ? stats.companies : '2.4k'}</p>
+                                        <p className="text-lg font-black tracking-tighter">{stats.companies}</p>
                                     </div>
                                     <div className="w-px h-8 bg-white/10" />
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Proofs</p>
-                                        <p className="text-lg font-black tracking-tighter">{stats.proofs > 0 ? stats.proofs : '815k'}</p>
+                                        <p className="text-lg font-black tracking-tighter">{stats.proofs}</p>
                                     </div>
                                     <div className="w-px h-8 bg-white/10" />
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1">Hired</p>
-                                        <p className="text-lg font-black tracking-tighter text-proof-accent">{stats.hired > 0 ? stats.hired : '102k'}</p>
+                                        <p className="text-lg font-black tracking-tighter text-proof-accent">{stats.hired}</p>
                                     </div>
                                 </div>
                                 <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all">

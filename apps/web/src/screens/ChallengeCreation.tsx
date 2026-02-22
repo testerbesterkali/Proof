@@ -38,6 +38,7 @@ export function ChallengeCreation() {
 
     // Step 2 — Details
     const [title, setTitle] = React.useState('');
+    const [jobRole, setJobRole] = React.useState('');
     const [description, setDescription] = React.useState('');
     const [requiredSkills, setRequiredSkills] = React.useState<string[]>([]);
     const [timeLimit, setTimeLimit] = React.useState('60 mins');
@@ -96,6 +97,7 @@ export function ChallengeCreation() {
                     title,
                     description,
                     type: challengeType,
+                    jobRole: jobRole || null,
                     timeLimitMins: parseTimeLimit(timeLimit),
                     prizeAmount: 0,
                     isPublic,
@@ -252,6 +254,15 @@ export function ChallengeCreation() {
                                             onChange={setTitle}
                                             suggestions={[]}
                                             placeholder="e.g. Senior Backend Systems Audit"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">Job Role</label>
+                                        <SuggestionInput
+                                            value={jobRole}
+                                            onChange={setJobRole}
+                                            suggestions={['Frontend Engineer', 'Backend Engineer', 'Fullstack Engineer', 'Mobile Developer', 'DevOps Engineer', 'Data Scientist', 'ML Engineer', 'Product Designer', 'UX Researcher', 'Product Manager', 'QA Engineer', 'Security Engineer', 'Solutions Architect', 'Engineering Manager']}
+                                            placeholder="e.g. Senior Frontend Engineer"
                                         />
                                     </div>
                                     <div>

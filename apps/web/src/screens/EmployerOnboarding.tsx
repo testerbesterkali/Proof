@@ -45,6 +45,7 @@ export function EmployerOnboarding() {
     const [companyName, setCompanyName] = React.useState('');
     const [industry, setIndustry] = React.useState('');
     const [companySize, setCompanySize] = React.useState('');
+    const [aboutCompany, setAboutCompany] = React.useState('');
 
     // Step 2 — Domain Verification
     const [website, setWebsite] = React.useState('');
@@ -95,6 +96,7 @@ export function EmployerOnboarding() {
                 companyName: companyName || null,
                 industry: industry || null,
                 companySize: companySize || null,
+                about: aboutCompany || null,
                 verifiedUrl: website || null,
                 workEmail: workEmail || null,
                 onboardingCompleted: true,
@@ -197,6 +199,15 @@ export function EmployerOnboarding() {
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold tracking-widest uppercase text-[#1C1C1E]/30 block mb-2">About Your Company</label>
+                                        <textarea
+                                            placeholder="Tell candidates what makes your company special — your mission, culture, and what you're building..."
+                                            className="w-full bg-[#F8F9FB] border border-black/5 rounded-xl p-4 min-h-[120px] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1C1C1E]/10 transition-all resize-none"
+                                            value={aboutCompany}
+                                            onChange={(e) => setAboutCompany(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </motion.div>

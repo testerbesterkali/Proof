@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Search, Filter, Clock, MapPin, Zap, ArrowRight, Share2, Bookmark, X, Users, DollarSign, Code, CheckCircle, ExternalLink, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Clock, MapPin, Zap, ArrowRight, Share2, Bookmark, X, Users, DollarSign, Code, CheckCircle, ExternalLink, Calendar, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Layout } from '../components/Layout';
 import { ProctoringModal } from '../components/ProctoringModal';
+import { supabase } from '../lib/supabase';
 
 interface Challenge {
     id: string;
@@ -23,116 +24,103 @@ interface Challenge {
     difficulty: 'Easy' | 'Medium' | 'Hard';
 }
 
-const challenges: Challenge[] = [
-    {
-        id: 'ch-1',
-        title: 'High-Freq Crypto Exchange',
-        company: 'Binance',
-        companyAbout: 'The world\'s largest cryptocurrency exchange by trading volume, serving 150M+ users across 180 countries with cutting-edge blockchain infrastructure.',
-        role: 'Senior Backend Engineer',
-        type: 'Backend',
-        prize: '$5,000',
-        match: 98,
-        fast: true,
-        description: 'Build a high-performance order matching engine capable of processing 100k+ transactions per second. Focus on low-latency architecture, WebSocket streaming, and fault tolerance.',
-        skills: ['Node.js', 'Redis', 'WebSocket', 'TypeScript', 'Docker'],
-        deadline: '4 days left',
-        participants: 84,
-        difficulty: 'Hard',
-    },
-    {
-        id: 'ch-2',
-        title: 'Design System Overhaul',
-        company: 'Figma',
-        companyAbout: 'The collaborative interface design tool used by teams at Google, Microsoft, and Airbnb to design, prototype, and ship products faster.',
-        role: 'Design Systems Lead',
-        type: 'Design',
-        prize: '$3,000',
-        match: 91,
-        fast: false,
-        description: 'Redesign and document a comprehensive design system with tokens, components, and patterns. Include accessibility guidelines and dark mode support.',
-        skills: ['Figma', 'Design Systems', 'CSS', 'Accessibility'],
-        deadline: '12 days left',
-        participants: 156,
-        difficulty: 'Medium',
-    },
-    {
-        id: 'ch-3',
-        title: 'Web3 Wallet Extension',
-        company: 'MetaMask',
-        companyAbout: 'The leading self-custodial crypto wallet with 30M+ monthly active users, enabling secure access to blockchain apps and DeFi protocols.',
-        role: 'Fullstack Web3 Engineer',
-        type: 'Fullstack',
-        prize: '$4,500',
-        match: 86,
-        fast: true,
-        description: 'Create a browser extension wallet supporting multiple chains. Implement secure key management, transaction signing, and dApp connectivity.',
-        skills: ['React', 'Ethers.js', 'Chrome Extensions', 'Solidity'],
-        deadline: '7 days left',
-        participants: 62,
-        difficulty: 'Hard',
-    },
-    {
-        id: 'ch-4',
-        title: 'AI Search Optimizer',
-        company: 'Perplexity',
-        companyAbout: 'An AI-native search engine combining large language models with real-time web data to deliver accurate, cited answers instantly.',
-        role: 'ML Engineer – Search',
-        type: 'AI/ML',
-        prize: '$6,000',
-        match: 94,
-        fast: true,
-        description: 'Build a retrieval-augmented generation pipeline that improves search relevance by 40%+. Focus on embedding quality, reranking, and streaming responses.',
-        skills: ['Python', 'LangChain', 'Vector DB', 'OpenAI', 'FastAPI'],
-        deadline: '5 days left',
-        participants: 203,
-        difficulty: 'Hard',
-    },
-    {
-        id: 'ch-5',
-        title: 'Real-time Analytics Dashboard',
-        company: 'Vercel',
-        companyAbout: 'The platform for frontend developers, providing tools to build, deploy, and scale modern web applications with zero configuration.',
-        role: 'Frontend Engineer',
-        type: 'Frontend',
-        prize: '$3,500',
-        match: 89,
-        fast: false,
-        description: 'Build a real-time analytics dashboard with live-updating charts, filterable metrics, and sub-second data refresh using Server-Sent Events.',
-        skills: ['React', 'D3.js', 'TypeScript', 'SSE', 'Tailwind'],
-        deadline: '10 days left',
-        participants: 118,
-        difficulty: 'Medium',
-    },
-    {
-        id: 'ch-6',
-        title: 'Mobile Payment SDK',
-        company: 'Stripe',
-        companyAbout: 'Financial infrastructure for the internet, powering payments for millions of businesses from startups to Fortune 500 companies worldwide.',
-        role: 'Mobile SDK Engineer',
-        type: 'Mobile',
-        prize: '$5,500',
-        match: 82,
-        fast: false,
-        description: 'Create a cross-platform mobile payment SDK with support for cards, Apple Pay, and Google Pay. Include 3DS authentication and PCI compliance.',
-        skills: ['React Native', 'Swift', 'Kotlin', 'Payments'],
-        deadline: '14 days left',
-        participants: 91,
-        difficulty: 'Hard',
-    },
-];
-
 const difficultyColor: Record<string, string> = {
     Easy: 'bg-green-100 text-green-700',
     Medium: 'bg-amber-100 text-amber-700',
     Hard: 'bg-red-100 text-red-700',
 };
 
+function getDifficulty(timeLimitMins: number | null): 'Easy' | 'Medium' | 'Hard' {
+    if (!timeLimitMins || timeLimitMins <= 30) return 'Easy';
+    if (timeLimitMins <= 90) return 'Medium';
+    return 'Hard';
+}
+
+function getDeadline(createdAt: string): string {
+    const created = new Date(createdAt);
+    const deadline = new Date(created.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days after creation
+    const now = new Date();
+    const diffDays = Math.max(0, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    if (diffDays === 0) return 'Closing today';
+    return `${diffDays} day${diffDays !== 1 ? 's' : ''} left`;
+}
+
 export function ChallengeDiscovery() {
     const navigate = useNavigate();
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [showFilters, setShowFilters] = useState(false);
     const [proctoringChallenge, setProctoringChallenge] = useState<Challenge | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        loadChallenges();
+    }, []);
+
+    const loadChallenges = async () => {
+        setLoading(true);
+        try {
+            const { data: rawChallenges } = await supabase
+                .from('Challenge')
+                .select('*')
+                .eq('status', 'ACTIVE')
+                .eq('isPublic', true)
+                .order('createdAt', { ascending: false });
+
+            if (!rawChallenges || rawChallenges.length === 0) {
+                setChallenges([]);
+                return;
+            }
+
+            // Fetch employer names
+            const employerIds = [...new Set(rawChallenges.map(c => c.employerId))];
+            const { data: employers } = await supabase
+                .from('EmployerProfile')
+                .select('id, companyName, industry, about')
+                .in('id', employerIds);
+
+            const empMap = new Map(employers?.map(e => [e.id, e]) || []);
+
+            // Count submissions per challenge
+            const challengeIds = rawChallenges.map(c => c.id);
+            const { data: submissions } = await supabase
+                .from('Submission')
+                .select('challengeId')
+                .in('challengeId', challengeIds);
+
+            const subCounts = new Map<string, number>();
+            submissions?.forEach(s => {
+                subCounts.set(s.challengeId, (subCounts.get(s.challengeId) || 0) + 1);
+            });
+
+            const formatted: Challenge[] = rawChallenges.map(c => {
+                const emp = empMap.get(c.employerId);
+                return {
+                    id: c.id,
+                    title: c.title,
+                    company: emp?.companyName || 'Unknown Company',
+                    companyAbout: emp?.about || (emp?.industry ? `A company in the ${emp.industry} industry.` : 'An innovative company hiring through Proof.'),
+                    role: c.jobRole || c.type || 'Engineer',
+                    type: c.type || 'Code',
+                    prize: c.prizeAmount > 0 ? `$${c.prizeAmount.toLocaleString()}` : 'Experience',
+                    match: Math.floor(Math.random() * 15) + 85,
+                    fast: (c.timeLimitMins || 0) <= 60,
+                    description: c.description,
+                    skills: c.requiredSkills || [],
+                    deadline: getDeadline(c.createdAt),
+                    participants: subCounts.get(c.id) || 0,
+                    difficulty: getDifficulty(c.timeLimitMins),
+                };
+            });
+
+            setChallenges(formatted);
+        } catch (err) {
+            console.error('Failed to load challenges:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Filter state
     const [filterType, setFilterType] = useState<string[]>([]);
@@ -189,7 +177,7 @@ export function ChallengeDiscovery() {
                         <div className="flex gap-3">
                             <div className="bg-white/60 backdrop-blur-md px-5 py-3 rounded-full flex items-center gap-3 border border-white shadow-sm">
                                 <Search size={16} className="text-[#1C1C1E]/30" />
-                                <input type="text" placeholder="Search challenges..." className="bg-transparent border-none outline-none text-sm font-medium w-48 placeholder-[#1C1C1E]/30" />
+                                <input type="text" placeholder="Search challenges..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="bg-transparent border-none outline-none text-sm font-medium w-48 placeholder-[#1C1C1E]/30" />
                             </div>
                             <button
                                 onClick={() => setShowFilters(!showFilters)}
@@ -391,95 +379,114 @@ export function ChallengeDiscovery() {
                     </AnimatePresence>
 
                     {/* Grid */}
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                        {challenges.map((challenge, i) => (
-                            <motion.div
-                                key={challenge.id}
-                                initial={{ opacity: 0, y: 15 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.06 }}
-                                onClick={() => setSelectedChallenge(challenge)}
-                                className={`group bg-white/60 backdrop-blur-2xl rounded-2xl p-6 border border-white shadow-glass hover:shadow-xl hover:bg-white transition-all cursor-pointer relative overflow-hidden aspect-square flex flex-col ${selectedChallenge?.id === challenge.id ? 'ring-2 ring-[#1C1C1E]' : ''}`}
-                            >
-                                {/* Top row */}
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="w-12 h-12 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center font-bold text-lg">
-                                        {challenge.company[0]}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {challenge.fast && (
-                                            <span className="bg-proof-accent/10 text-proof-accent px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
-                                                <Zap size={9} fill="currentColor" /> Rapid
+                    {loading ? (
+                        <div className="flex items-center justify-center py-24">
+                            <Loader2 className="w-8 h-8 animate-spin text-[#1C1C1E]/20" />
+                        </div>
+                    ) : challenges.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-24 text-[#1C1C1E]/40">
+                            <Code className="w-16 h-16 mb-4 opacity-20" />
+                            <h2 className="text-2xl font-bold tracking-tight mb-2">No Challenges Yet</h2>
+                            <p className="text-sm font-medium">Check back soon — employers are creating new challenges.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            {challenges.filter(c => {
+                                const q = searchQuery.toLowerCase();
+                                if (q && !c.title.toLowerCase().includes(q) && !c.company.toLowerCase().includes(q) && !c.type.toLowerCase().includes(q)) return false;
+                                if (filterType.length > 0 && !filterType.some(ft => c.type.toLowerCase().includes(ft.toLowerCase()))) return false;
+                                if (filterDifficulty.length > 0 && !filterDifficulty.includes(c.difficulty)) return false;
+                                if (filterSkills.length > 0 && !filterSkills.some(fs => c.skills.some(sk => sk.toLowerCase().includes(fs.toLowerCase())))) return false;
+                                return true;
+                            }).map((challenge, i) => (
+                                <motion.div
+                                    key={challenge.id}
+                                    initial={{ opacity: 0, y: 15 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.06 }}
+                                    onClick={() => setSelectedChallenge(challenge)}
+                                    className={`group bg-white/60 backdrop-blur-2xl rounded-2xl p-6 border border-white shadow-glass hover:shadow-xl hover:bg-white transition-all cursor-pointer relative overflow-hidden aspect-square flex flex-col ${selectedChallenge?.id === challenge.id ? 'ring-2 ring-[#1C1C1E]' : ''}`}
+                                >
+                                    {/* Top row */}
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="w-12 h-12 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center font-bold text-lg">
+                                            {challenge.company[0]}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {challenge.fast && (
+                                                <span className="bg-proof-accent/10 text-proof-accent px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                                    <Zap size={9} fill="currentColor" /> Rapid
+                                                </span>
+                                            )}
+                                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold ${difficultyColor[challenge.difficulty]}`}>
+                                                {challenge.difficulty}
                                             </span>
-                                        )}
-                                        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold ${difficultyColor[challenge.difficulty]}`}>
-                                            {challenge.difficulty}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Info */}
-                                <div className="flex-1 flex flex-col">
-                                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-proof-accent mb-1">{challenge.type}</p>
-                                    <h3 className="text-base font-bold tracking-tight leading-snug mb-1.5">{challenge.title}</h3>
-                                    <p className="text-xs text-[#1C1C1E]/40 font-medium mb-0.5">{challenge.company} · {challenge.role}</p>
-
-                                    {/* Short description */}
-                                    <p className="text-xs text-[#1C1C1E]/50 leading-relaxed font-medium line-clamp-2 mt-2 mb-3">
-                                        {challenge.description}
-                                    </p>
-
-                                    {/* About company snippet */}
-                                    <div className="bg-[#F8F9FB] rounded-xl p-3 mb-3 border border-black/5">
-                                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#1C1C1E]/25 mb-1">About {challenge.company}</p>
-                                        <p className="text-[11px] text-[#1C1C1E]/40 leading-relaxed font-medium line-clamp-2">{challenge.companyAbout}</p>
+                                        </div>
                                     </div>
 
-                                    {/* Skills */}
-                                    <div className="flex flex-wrap gap-1.5 mb-3">
-                                        {challenge.skills.slice(0, 3).map(skill => (
-                                            <span key={skill} className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/50">
-                                                {skill}
+                                    {/* Info */}
+                                    <div className="flex-1 flex flex-col">
+                                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-proof-accent mb-1">{challenge.type}</p>
+                                        <h3 className="text-base font-bold tracking-tight leading-snug mb-1.5">{challenge.title}</h3>
+                                        <p className="text-xs text-[#1C1C1E]/40 font-medium mb-0.5">{challenge.company} · {challenge.role}</p>
+
+                                        {/* Short description */}
+                                        <p className="text-xs text-[#1C1C1E]/50 leading-relaxed font-medium line-clamp-2 mt-2 mb-3">
+                                            {challenge.description}
+                                        </p>
+
+                                        {/* About company snippet */}
+                                        <div className="bg-[#F8F9FB] rounded-xl p-3 mb-3 border border-black/5">
+                                            <p className="text-[9px] font-bold uppercase tracking-widest text-[#1C1C1E]/25 mb-1">About {challenge.company}</p>
+                                            <p className="text-[11px] text-[#1C1C1E]/40 leading-relaxed font-medium line-clamp-2">{challenge.companyAbout}</p>
+                                        </div>
+
+                                        {/* Skills */}
+                                        <div className="flex flex-wrap gap-1.5 mb-3">
+                                            {challenge.skills.slice(0, 3).map(skill => (
+                                                <span key={skill} className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/50">
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                            {challenge.skills.length > 3 && (
+                                                <span className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/30">
+                                                    +{challenge.skills.length - 3}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Meta */}
+                                        <div className="flex items-center gap-3 text-[10px] text-[#1C1C1E]/30 font-medium">
+                                            <span className="flex items-center gap-1"><Clock size={10} /> {challenge.deadline}</span>
+                                            <span className="flex items-center gap-1"><Users size={10} /> {challenge.participants}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom */}
+                                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-black/5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-green-600 flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                                                {challenge.match}% match
                                             </span>
-                                        ))}
-                                        {challenge.skills.length > 3 && (
-                                            <span className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/30">
-                                                +{challenge.skills.length - 3}
-                                            </span>
-                                        )}
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setProctoringChallenge(challenge);
+                                            }}
+                                            className="bg-[#1C1C1E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#1C1C1E]/80 transition-colors flex items-center gap-1.5"
+                                        >
+                                            Start <ArrowRight size={14} />
+                                        </button>
                                     </div>
 
-                                    {/* Meta */}
-                                    <div className="flex items-center gap-3 text-[10px] text-[#1C1C1E]/30 font-medium">
-                                        <span className="flex items-center gap-1"><Clock size={10} /> {challenge.deadline}</span>
-                                        <span className="flex items-center gap-1"><Users size={10} /> {challenge.participants}</span>
-                                    </div>
-                                </div>
-
-                                {/* Bottom */}
-                                <div className="flex items-center justify-between mt-auto pt-4 border-t border-black/5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-green-600 flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                                            {challenge.match}% match
-                                        </span>
-                                    </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setProctoringChallenge(challenge);
-                                        }}
-                                        className="bg-[#1C1C1E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#1C1C1E]/80 transition-colors flex items-center gap-1.5"
-                                    >
-                                        Start <ArrowRight size={14} />
-                                    </button>
-                                </div>
-
-                                {/* Hover decoration */}
-                                <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-[#F8F9FB] rounded-full opacity-0 group-hover:opacity-30 transition-opacity" />
-                            </motion.div>
-                        ))}
-                    </div>
+                                    {/* Hover decoration */}
+                                    <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-[#F8F9FB] rounded-full opacity-0 group-hover:opacity-30 transition-opacity" />
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* SLIDE-IN DETAIL PANEL */}
