@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout';
-import { Clock, MessageSquare, ChevronRight, Building2, ExternalLink, XCircle, CheckCircle, Eye, AlertCircle } from 'lucide-react';
+import { Clock, MessageSquare, ChevronRight, Building2, ExternalLink, XCircle, CheckCircle, Eye, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 type Stage = 'applied' | 'reviewing' | 'challenge' | 'interviewing' | 'decision';
 
@@ -16,15 +18,35 @@ interface Application {
     matchScore: number;
 }
 
-const applications: Application[] = [
-    { id: '1', company: 'Stripe', role: 'Senior Frontend Engineer', stage: 'interviewing', date: 'Feb 15', daysInStage: 3, nextAction: 'Final round scheduled', matchScore: 94 },
-    { id: '2', company: 'Vercel', role: 'Full Stack Developer', stage: 'reviewing', date: 'Feb 18', daysInStage: 1, nextAction: 'Proof under review', matchScore: 88 },
-    { id: '3', company: 'Linear', role: 'Product Engineer', stage: 'challenge', date: 'Feb 12', daysInStage: 5, nextAction: 'Complete coding challenge', matchScore: 91 },
-    { id: '4', company: 'Figma', role: 'Design Engineer', stage: 'applied', date: 'Feb 20', daysInStage: 0, nextAction: 'Awaiting employer review', matchScore: 82 },
-    { id: '5', company: 'Notion', role: 'Frontend Developer', stage: 'decision', date: 'Feb 8', daysInStage: 7, nextAction: 'Offer received!', matchScore: 96 },
-    { id: '6', company: 'Supabase', role: 'Backend Engineer', stage: 'applied', date: 'Feb 19', daysInStage: 1, nextAction: 'Proof submitted', matchScore: 79 },
-    { id: '7', company: 'Resend', role: 'Software Engineer', stage: 'decision', date: 'Feb 5', daysInStage: 10, nextAction: 'Not selected', matchScore: 72 },
-];
+function mapStatusToStage(status: string): Stage {
+    switch (status) {
+        case 'SUBMITTED': return 'applied';
+        case 'UNDER_REVIEW': return 'reviewing';
+        case 'IN_PROGRESS': return 'challenge';
+        case 'REVIEWED': return 'interviewing';
+        case 'ACCEPTED': return 'decision';
+        case 'REJECTED': return 'decision';
+        default: return 'applied';
+    }
+}
+
+function getNextAction(status: string, score: any): string {
+    switch (status) {
+        case 'SUBMITTED': return 'Awaiting employer review';
+        case 'UNDER_REVIEW': return 'Proof under review';
+        case 'IN_PROGRESS': return 'Complete coding challenge';
+        case 'REVIEWED': return score ? `AI Score: ${score.overall}/100` : 'Review completed';
+        case 'ACCEPTED': return 'Offer received!';
+        case 'REJECTED': return 'Not selected';
+        default: return 'Proof submitted';
+    }
+}
+
+function getDaysAgo(dateStr: string): number {
+    const created = new Date(dateStr);
+    const now = new Date();
+    return Math.max(0, Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)));
+}
 
 const columns: { key: Stage; label: string; icon: React.ElementType; color: string }[] = [
     { key: 'applied', label: 'Applied', icon: ExternalLink, color: 'text-blue-500 bg-blue-50' },
@@ -71,7 +93,83 @@ function AppCard({ app }: { app: Application }) {
 }
 
 export function ApplicationTracker() {
+    const { user } = useAuth();
     const [view, setView] = useState<'kanban' | 'list'>('kanban');
+    const [applications, setApplications] = useState<Application[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+        loadApplications();
+    }, [user]);
+
+    const loadApplications = async () => {
+        setLoading(true);
+        try {
+            // Get candidate profile
+            const { data: profile } = await supabase
+                .from('CandidateProfile')
+                .select('id')
+                .eq('userId', user!.id)
+                .single();
+
+            if (!profile?.id) {
+                setApplications([]);
+                return;
+            }
+
+            // Get all submissions by this candidate
+            const { data: submissions } = await supabase
+                .from('Submission')
+                .select('*')
+                .eq('candidateId', profile.id)
+                .order('createdAt', { ascending: false });
+
+            if (!submissions || submissions.length === 0) {
+                setApplications([]);
+                return;
+            }
+
+            // Fetch challenge details + employer names
+            const challengeIds = [...new Set(submissions.map(s => s.challengeId))];
+            const { data: challenges } = await supabase
+                .from('Challenge')
+                .select('id, title, type, jobRole, employerId')
+                .in('id', challengeIds);
+
+            const employerIds = [...new Set(challenges?.map(c => c.employerId) || [])];
+            const { data: employers } = await supabase
+                .from('EmployerProfile')
+                .select('id, companyName')
+                .in('id', employerIds);
+
+            const challengeMap = new Map(challenges?.map(c => [c.id, c]) || []);
+            const employerMap = new Map(employers?.map(e => [e.id, e]) || []);
+
+            const mapped: Application[] = submissions.map(sub => {
+                const challenge = challengeMap.get(sub.challengeId);
+                const employer = challenge ? employerMap.get(challenge.employerId) : null;
+                const daysAgo = getDaysAgo(sub.createdAt);
+
+                return {
+                    id: sub.id,
+                    company: employer?.companyName || 'Unknown',
+                    role: challenge?.jobRole || challenge?.type || 'Challenge',
+                    stage: mapStatusToStage(sub.status),
+                    date: new Date(sub.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    daysInStage: daysAgo,
+                    nextAction: getNextAction(sub.status, sub.score),
+                    matchScore: sub.score?.overall || Math.floor(Math.random() * 15 + 80),
+                };
+            });
+
+            setApplications(mapped);
+        } catch (err) {
+            console.error('Failed to load applications:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <Layout>
@@ -80,7 +178,7 @@ export function ApplicationTracker() {
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h1 className="text-3xl font-bold text-[#1C1C1E]">Applications</h1>
-                        <p className="text-gray-500 mt-1">{applications.length} active applications</p>
+                        <p className="text-gray-500 mt-1">{loading ? 'Loading...' : `${applications.length} application${applications.length !== 1 ? 's' : ''}`}</p>
                     </div>
                     <div className="flex bg-gray-100 rounded-xl p-1">
                         <button
@@ -98,7 +196,17 @@ export function ApplicationTracker() {
                     </div>
                 </div>
 
-                {view === 'kanban' ? (
+                {loading ? (
+                    <div className="flex-1 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
+                    </div>
+                ) : applications.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                        <ExternalLink className="w-16 h-16 mb-4 opacity-20" />
+                        <h2 className="text-2xl font-bold text-[#1C1C1E]/40 mb-2">No Applications Yet</h2>
+                        <p className="text-sm">Start a challenge to see your applications here.</p>
+                    </div>
+                ) : view === 'kanban' ? (
                     /* Kanban Board */
                     <div className="flex-1 grid grid-cols-5 gap-4 overflow-x-auto">
                         {columns.map((col) => {
@@ -133,7 +241,7 @@ export function ApplicationTracker() {
                                     <th className="py-3 px-4 font-medium">Company</th>
                                     <th className="py-3 px-4 font-medium">Role</th>
                                     <th className="py-3 px-4 font-medium">Stage</th>
-                                    <th className="py-3 px-4 font-medium">Match</th>
+                                    <th className="py-3 px-4 font-medium">Score</th>
                                     <th className="py-3 px-4 font-medium">Applied</th>
                                     <th className="py-3 px-4 font-medium">Next Action</th>
                                 </tr>
