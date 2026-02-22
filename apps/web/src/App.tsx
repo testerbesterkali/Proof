@@ -28,6 +28,7 @@ export default function App() {
                     <Route path="/employer/dashboard" element={<EmployerDashboard />} />
                     <Route path="/employer/create-challenge" element={<ChallengeCreation />} />
                     <Route path="/employer/review/:submissionId" element={<SubmissionReview />} />
+                    <Route path="/messages" element={<Messages />} />
                 </Routes>
             </BrowserRouter>
         </QueryClientProvider>

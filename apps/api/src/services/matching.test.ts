@@ -1,17 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MatchingService } from './matching';
-import { prisma } from '../utils/prisma';
 
-vi.mock('../utils/prisma', () => ({
-    prisma: {
-        challenge: {
-            findUnique: vi.fn()
-        },
-        proof: {
-            findMany: vi.fn()
+// Explicitly mock the module
+vi.mock('../utils/prisma', () => {
+    return {
+        prisma: {
+            challenge: {
+                findUnique: vi.fn(),
+            },
+            proof: {
+                findMany: vi.fn(),
+            },
         }
     }
-}));
+});
+
+// Import after mocking
+import { prisma } from '../utils/prisma';
+import { MatchingService } from './matching';
 
 describe('MatchingService', () => {
     beforeEach(() => {
@@ -19,46 +24,46 @@ describe('MatchingService', () => {
     });
 
     it('should calculate 100% match when all skills overlap', async () => {
-        (prisma.challenge.findUnique as any).mockResolvedValue({
+        vi.mocked(prisma.challenge.findUnique).mockResolvedValue({
             requiredSkills: ['React', 'TypeScript']
-        });
-        (prisma.proof.findMany as any).mockResolvedValue([
+        } as any);
+        vi.mocked(prisma.proof.findMany).mockResolvedValue([
             { skillTags: ['react', 'node'] },
             { skillTags: ['typescript'] }
-        ]);
+        ] as any);
 
         const score = await MatchingService.calculateMatchScore('candidate-1', 'challenge-1');
         expect(score).toBe(100);
     });
 
     it('should calculate 50% match when half skills overlap', async () => {
-        (prisma.challenge.findUnique as any).mockResolvedValue({
+        vi.mocked(prisma.challenge.findUnique).mockResolvedValue({
             requiredSkills: ['React', 'Go', 'Docker', 'K8s']
-        });
-        (prisma.proof.findMany as any).mockResolvedValue([
+        } as any);
+        vi.mocked(prisma.proof.findMany).mockResolvedValue([
             { skillTags: ['react', 'docker'] }
-        ]);
+        ] as any);
 
         const score = await MatchingService.calculateMatchScore('candidate-1', 'challenge-1');
         expect(score).toBe(50);
     });
 
     it('should return 0% match when no skills overlap', async () => {
-        (prisma.challenge.findUnique as any).mockResolvedValue({
+        vi.mocked(prisma.challenge.findUnique).mockResolvedValue({
             requiredSkills: ['Rust']
-        });
-        (prisma.proof.findMany as any).mockResolvedValue([
+        } as any);
+        vi.mocked(prisma.proof.findMany).mockResolvedValue([
             { skillTags: ['Java'] }
-        ]);
+        ] as any);
 
         const score = await MatchingService.calculateMatchScore('candidate-1', 'challenge-1');
         expect(score).toBe(0);
     });
 
     it('should return 50 as default if challenge has no required skills', async () => {
-        (prisma.challenge.findUnique as any).mockResolvedValue({
+        vi.mocked(prisma.challenge.findUnique).mockResolvedValue({
             requiredSkills: []
-        });
+        } as any);
 
         const score = await MatchingService.calculateMatchScore('candidate-1', 'challenge-1');
         expect(score).toBe(50);
