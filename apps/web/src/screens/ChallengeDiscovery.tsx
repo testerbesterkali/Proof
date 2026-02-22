@@ -1,10 +1,12 @@
 import React from 'react';
 import { Search, Mail, Briefcase, Inbox, Users, Filter, Clock, MapPin, Zap, ArrowRight, Share2, Bookmark } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SubmissionFlow } from '../components/SubmissionFlow';
 
 export function ChallengeDiscovery() {
+    const navigate = useNavigate();
     const [selectedChallenge, setSelectedChallenge] = React.useState<string | null>(null);
     const challenges = [
         { title: "High-Freq Crypto Exchange", company: "Binance", type: "Backend", prize: "$5k", match: 98, fast: true },
@@ -99,10 +101,13 @@ export function ChallengeDiscovery() {
                                         <button className="p-3 bg-[#E4E5E7]/50 rounded-full text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-colors"><Share2 size={18} /></button>
                                         <button className="p-3 bg-[#E4E5E7]/50 rounded-full text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-colors"><Bookmark size={18} /></button>
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); setSelectedChallenge(challenge.title); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/challenge/ch-${i}`);
+                                            }}
                                             className="bg-[#1C1C1E] text-white px-8 py-4 rounded-full font-bold shadow-lg hover:translate-x-1 transition-all flex items-center gap-2"
                                         >
-                                            Apply Now <ArrowRight size={18} />
+                                            Start Challenge <ArrowRight size={18} />
                                         </button>
                                     </div>
                                 </div>

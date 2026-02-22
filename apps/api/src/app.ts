@@ -5,6 +5,8 @@ import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
 import authRoutes from './routes/auth';
+import employerRoutes from './routes/employer';
+import challengeRoutes from './routes/challenge';
 
 const app = Fastify({
     logger: true
@@ -31,6 +33,8 @@ app.register(cookie, {
 });
 
 app.register(authRoutes, { prefix: '/api/v1/auth' });
+app.register(employerRoutes, { prefix: '/api/v1/employer' });
+app.register(challengeRoutes, { prefix: '/api/v1/challenge' });
 
 app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };

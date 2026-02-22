@@ -4,6 +4,34 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-[#EAEBEC] to-[#D8D9DB] text-[#1C1C1E];
+    @apply text-[#1C1C1E] antialiased min-h-screen relative overflow-x-hidden;
+    background: #EAEBEC;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 50% 50%, #FF9B8A 0%, rgba(255, 155, 138, 0) 50%),
+      radial-gradient(circle at 80% 20%, #EAEBEC 0%, rgba(234, 235, 236, 0) 50%),
+      radial-gradient(circle at 20% 80%, #D8D9DB 0%, rgba(216, 217, 219, 0) 50%),
+      radial-gradient(circle at 10% 10%, #FFFFFF 0%, rgba(255, 255, 255, 0) 50%);
+    opacity: 0.4;
+    filter: blur(100px);
+    z-index: -1;
+    animation: mesh-flow 30s ease-in-out infinite alternate;
+  }
+
+  @keyframes mesh-flow {
+    0% {
+      transform: rotate(0deg) scale(1);
+    }
+
+    100% {
+      transform: rotate(10deg) scale(1.1);
+    }
   }
 }

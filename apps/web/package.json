@@ -12,6 +12,7 @@
     },
     "dependencies": {
         "@hookform/resolvers": "^3.3.4",
+        "@monaco-editor/react": "^4.7.0",
         "@proof/shared-types": "*",
         "@proof/ui-components": "*",
         "@tanstack/react-query": "^5.24.1",

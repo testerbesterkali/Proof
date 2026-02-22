@@ -25,6 +25,7 @@ model User {
   employerProfile  EmployerProfile?
   messagesSent     Message[]         @relation("Sender")
   messagesReceived Message[]         @relation("Receiver")
+  reviewComments   SubmissionComment[]
 }
 
 model CandidateProfile {
@@ -111,6 +112,7 @@ model Challenge {
   prizeAmount   Int             @default(0)
   isPublic      Boolean         @default(true)
   status        String          // DRAFT, ACTIVE, CLOSED
+  rubric        Json?           // Array of { criteria: string, weight: number }
   
   submissions   Submission[]
 
@@ -124,15 +126,29 @@ model Submission {
   challenge       Challenge        @relation(fields: [challengeId], references: [id])
   candidateId     String
   candidate       CandidateProfile @relation(fields: [candidateId], references: [id])
-  content         String?          // JSON or Text
+  content         Json?            // Stores { code: string, language: string, etc }
   assetUrls       String[]
   status          String           // SUBMITTED, UNDER_REVIEW, REJECTED, ADVANCED
   aiScore         Float?
   employerRating  Int?
+  rubricScores    Json?            // Stores evaluation results
   feedback        String?
+
+  comments        SubmissionComment[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+model SubmissionComment {
+  id           String     @id @default(uuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id])
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id])
+  content      String
+  
+  createdAt    DateTime   @default(now())
 }
 
 model Message {
