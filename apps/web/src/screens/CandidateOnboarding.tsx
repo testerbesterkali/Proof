@@ -34,18 +34,40 @@ export function CandidateOnboarding() {
     const totalSteps = 4;
 
     // Step 1 — Profile basics
-    const [headline, setHeadline] = useState('');
-    const [location, setLocation] = useState('');
-    const [experience, setExperience] = useState('');
+    const [headline, setHeadline] = useState(() => sessionStorage.getItem('onboarding_headline') || '');
+    const [location, setLocation] = useState(() => sessionStorage.getItem('onboarding_location') || '');
+    const [experience, setExperience] = useState(() => sessionStorage.getItem('onboarding_experience') || '');
 
     // Step 2 — Skills
-    const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+    const [selectedSkills, setSelectedSkills] = useState<string[]>(() => JSON.parse(sessionStorage.getItem('onboarding_skills') || '[]'));
 
     // Step 3 — Preferences
-    const [preferredRoles, setPreferredRoles] = useState<string[]>([]);
-    const [availability, setAvailability] = useState('');
-    const [salaryMin, setSalaryMin] = useState('');
-    const [remote, setRemote] = useState(true);
+    const [preferredRoles, setPreferredRoles] = useState<string[]>(() => JSON.parse(sessionStorage.getItem('onboarding_roles') || '[]'));
+    const [availability, setAvailability] = useState(() => sessionStorage.getItem('onboarding_availability') || '');
+    const [salaryMin, setSalaryMin] = useState(() => sessionStorage.getItem('onboarding_salaryMin') || '');
+    const [remote, setRemote] = useState(() => sessionStorage.getItem('onboarding_remote') !== 'false');
+    const [resumeUrl, setResumeUrl] = useState(() => sessionStorage.getItem('onboarding_resumeUrl') || '');
+
+    // Auto-fill state
+    const [isParsing, setIsParsing] = useState(false);
+    const [autoFilled, setAutoFilled] = useState(() => sessionStorage.getItem('onboarding_autoFilled') === 'true');
+    const [autoFillSource, setAutoFillSource] = useState<'resume' | 'linkedin' | null>(() => sessionStorage.getItem('onboarding_autoFillSource') as any || null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Sync state to sessionStorage
+    useEffect(() => {
+        sessionStorage.setItem('onboarding_headline', headline);
+        sessionStorage.setItem('onboarding_location', location);
+        sessionStorage.setItem('onboarding_experience', experience);
+        sessionStorage.setItem('onboarding_skills', JSON.stringify(selectedSkills));
+        sessionStorage.setItem('onboarding_roles', JSON.stringify(preferredRoles));
+        sessionStorage.setItem('onboarding_availability', availability);
+        sessionStorage.setItem('onboarding_salaryMin', salaryMin);
+        sessionStorage.setItem('onboarding_remote', String(remote));
+        sessionStorage.setItem('onboarding_resumeUrl', resumeUrl);
+        sessionStorage.setItem('onboarding_autoFilled', String(autoFilled));
+        if (autoFillSource) sessionStorage.setItem('onboarding_autoFillSource', autoFillSource);
+    }, [headline, location, experience, selectedSkills, preferredRoles, availability, salaryMin, remote, resumeUrl, autoFilled, autoFillSource]);
 
     // Step 4 — Connect accounts
     const [githubConnected, setGithubConnected] = useState(false);
@@ -69,12 +91,6 @@ export function CandidateOnboarding() {
         }
     }, [linkedProviders, user]);
 
-    // Auto-fill state
-    const [isParsing, setIsParsing] = useState(false);
-    const [autoFilled, setAutoFilled] = useState(false);
-    const [autoFillSource, setAutoFillSource] = useState<'resume' | 'linkedin' | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
     const toggleSkill = (skill: string) => {
         setSelectedSkills(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]);
     };
@@ -82,35 +98,51 @@ export function CandidateOnboarding() {
         setPreferredRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
     };
 
-    const simulateAutoFill = (source: 'resume' | 'linkedin') => {
-        setIsParsing(true);
-        setAutoFillSource(source);
-
-        // Simulate AI parsing delay
-        setTimeout(() => {
-            setHeadline('Senior Frontend Engineer');
-            setLocation('San Francisco, CA');
-            setExperience('5-10 years');
-            setSelectedSkills(['React', 'TypeScript', 'Node.js', 'Docker', 'UI/UX', 'Figma']);
-            setPreferredRoles(['Full-Time', 'Contract']);
-            setAvailability('Actively Looking');
-            setSalaryMin('120,000');
-            setRemote(true);
-            if (source === 'linkedin') setLinkedinConnected(true);
-            setIsParsing(false);
-            setAutoFilled(true);
-        }, 2200);
-    };
-
-    const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            simulateAutoFill('resume');
+        if (!file || !user) return;
+
+        setIsParsing(true);
+        setAutoFillSource('resume');
+
+        try {
+            // Upload to Supabase Storage
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+                .from('resumes')
+                .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('resumes')
+                .getPublicUrl(fileName);
+
+            setResumeUrl(publicUrl);
+
+            // Simulate AI parsing delay
+            setTimeout(() => {
+                setHeadline('Senior Frontend Engineer');
+                setLocation('San Francisco, CA');
+                setExperience('5-10 years');
+                setSelectedSkills(['React', 'TypeScript', 'Node.js', 'Docker', 'UI/UX', 'Figma']);
+                setPreferredRoles(['Full-Time', 'Contract']);
+                setAvailability('Actively Looking');
+                setSalaryMin('120,000');
+                setRemote(true);
+                setIsParsing(false);
+                setAutoFilled(true);
+            }, 2200);
+        } catch (error) {
+            console.error("Error uploading resume:", error);
+            setIsParsing(false);
+            setAutoFillSource(null);
         }
     };
 
     const canProceed = () => {
-        if (step === 1) return headline.trim() !== '';
+        if (step === 1) return headline.trim() !== '' && autoFillSource === 'resume';
         if (step === 2) return selectedSkills.length >= 2;
         if (step === 3) return availability !== '';
         return true;
@@ -163,6 +195,7 @@ export function CandidateOnboarding() {
                 remote,
                 githubUrl: githubConnected ? 'connected' : null,
                 linkedinUrl: linkedinConnected ? 'connected' : null,
+                resumeUrl: resumeUrl || null,
                 onboardingCompleted: true,
                 updatedAt: new Date().toISOString(),
             };
@@ -241,13 +274,13 @@ export function CandidateOnboarding() {
                                             <Sparkles className="w-5 h-5 text-proof-accent" />
                                             <p className="font-bold text-sm">Skip the typing — auto-fill your profile</p>
                                         </div>
-                                        <p className="text-white/50 text-xs mb-4">Upload your resume or connect LinkedIn and we'll extract everything for you.</p>
+                                        <p className="text-white/50 text-xs mb-4">You must upload your resume to proceed. We will extract everything for you.</p>
 
                                         {isParsing ? (
                                             <div className="flex items-center gap-3 bg-white/10 rounded-xl p-4">
                                                 <Loader2 className="w-5 h-5 text-proof-accent animate-spin" />
                                                 <div>
-                                                    <p className="text-sm font-semibold">Analyzing your {autoFillSource === 'resume' ? 'resume' : 'LinkedIn profile'}...</p>
+                                                    <p className="text-sm font-bold text-green-700">✓ Detected {selectedSkills.length} skills and basic info.</p>
                                                     <p className="text-xs text-white/40">Extracting skills, experience, and preferences</p>
                                                 </div>
                                             </div>
@@ -262,17 +295,9 @@ export function CandidateOnboarding() {
                                                 />
                                                 <button
                                                     onClick={() => fileInputRef.current?.click()}
-                                                    className="flex-1 flex items-center justify-center gap-2 bg-white text-[#1C1C1E] py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors"
+                                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-colors ${resumeUrl ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-white text-[#1C1C1E] hover:bg-gray-100'}`}
                                                 >
-                                                    <FileUp className="w-4 h-4" /> Upload Resume
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        signInWithLinkedIn(window.location.origin + '/onboarding/candidate?step=1');
-                                                    }}
-                                                    className="flex-1 flex items-center justify-center gap-2 bg-[#0077B5] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#006097] transition-colors"
-                                                >
-                                                    <Linkedin className="w-4 h-4" /> Import LinkedIn
+                                                    <FileUp className="w-4 h-4" /> {resumeUrl ? 'Resume Uploaded' : 'Upload Resume'}
                                                 </button>
                                             </div>
                                         )}

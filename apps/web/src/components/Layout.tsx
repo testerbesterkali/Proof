@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2, Search, Bell, LogOut } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Mail, Inbox, Users, ArrowRight, BarChart3, Kanban, Link2, Search, Bell, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
@@ -23,6 +23,7 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
     ];
 
     const settingsItems = [
+        { icon: User, path: '/profile', label: 'Profile' },
         { icon: Link2, path: '/settings/accounts', label: 'Accounts' },
     ];
 
@@ -37,7 +38,7 @@ export function Layout({ children, showFindChallenge = true }: LayoutProps) {
         if (currentPath === '/analytics') return 'Analytics';
         if (currentPath === '/messages') return 'Messages';
         if (currentPath === '/upload') return 'Record Proof';
-        if (currentPath === '/settings/accounts') return 'Connected Accounts';
+        if (currentPath === '/profile') return 'Candidate Profile';
         if (currentPath.startsWith('/employer')) return 'Employer';
         return 'Proof';
     };

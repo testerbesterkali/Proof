@@ -54,6 +54,7 @@ export function ChallengeCreation() {
     const [aiRole, setAiRole] = React.useState('');
     const [generating, setGenerating] = React.useState(false);
     const [aiError, setAiError] = React.useState('');
+    const [difficulty, setDifficulty] = React.useState('Medium');
 
     const canProceed = () => {
         if (step === 1) return challengeType !== '';
@@ -124,7 +125,7 @@ export function ChallengeCreation() {
 
         try {
             const { data, error } = await supabase.functions.invoke('generate-challenge', {
-                body: { role: aiRole, challengeType }
+                body: { role: aiRole, challengeType, difficulty }
             });
 
             if (error) {
@@ -234,10 +235,20 @@ export function ChallengeCreation() {
                                                 onKeyDown={e => e.key === 'Enter' && handleGenerateAI()}
                                                 className="flex-1 bg-white/10 border border-white/20 focus:border-proof-accent transition-all rounded-xl px-4 py-3 text-sm focus:outline-none placeholder:text-white/30"
                                             />
+                                            <select
+                                                value={difficulty}
+                                                onChange={e => setDifficulty(e.target.value)}
+                                                className="bg-white/10 border border-white/20 focus:border-proof-accent transition-all rounded-xl px-4 py-3 text-sm focus:outline-none text-white appearance-none min-w-[110px] cursor-pointer"
+                                                style={{ WebkitAppearance: 'none' }}
+                                            >
+                                                <option className="text-black" value="Easy">Easy</option>
+                                                <option className="text-black" value="Medium">Medium</option>
+                                                <option className="text-black" value="Hard">Hard</option>
+                                            </select>
                                             <button
                                                 onClick={handleGenerateAI}
                                                 disabled={generating || !aiRole.trim()}
-                                                className="bg-proof-accent text-[#1C1C1E] px-6 rounded-xl font-bold text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                className="bg-proof-accent text-[#1C1C1E] px-6 rounded-xl font-bold text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
                                             >
                                                 {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : 'Generate'}
                                             </button>

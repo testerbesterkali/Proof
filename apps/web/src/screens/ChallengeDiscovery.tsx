@@ -506,7 +506,7 @@ export function ChallengeDiscovery() {
                                                 <p className="text-xs text-[#1C1C1E]/40 font-medium mb-0.5">{challenge.company} · {challenge.role}</p>
 
                                                 {/* Short description */}
-                                                <p className="text-xs text-[#1C1C1E]/50 leading-relaxed font-medium line-clamp-2 mt-2 mb-3">
+                                                <p className="text-xs text-[#1C1C1E]/50 leading-relaxed font-medium line-clamp-3 mt-2 mb-3 whitespace-pre-line">
                                                     {challenge.description}
                                                 </p>
 

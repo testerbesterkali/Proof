@@ -114,10 +114,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Link an additional provider to the current user (preserves session)
     const linkProvider = async (provider: 'google' | 'github' | 'linkedin_oidc', redirectTo?: string) => {
-        await supabase.auth.linkIdentity({
+        await supabase.auth.signInWithOAuth({
             provider,
             options: {
                 redirectTo: redirectTo || window.location.href,
+                scopes: provider === 'github' ? 'read:user user:email' : undefined,
             },
         });
     };

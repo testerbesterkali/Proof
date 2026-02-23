@@ -21,6 +21,8 @@ import { Login } from './screens/Login';
 import { EmployerChallenges } from './screens/EmployerChallenges';
 import { EmployerSubmissions } from './screens/EmployerSubmissions';
 import { EmployerMessages } from './screens/EmployerMessages';
+import { CandidateProfile } from './screens/CandidateProfile';
+import { EmployerProfile } from './screens/EmployerProfile';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -48,6 +50,7 @@ export default function App() {
                         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
                         <Route path="/applications" element={<ProtectedRoute><ApplicationTracker /></ProtectedRoute>} />
                         <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+                        <Route path="/profile" element={<ProtectedRoute><CandidateProfile /></ProtectedRoute>} />
                         <Route path="/settings/accounts" element={<ProtectedRoute><ConnectedAccounts /></ProtectedRoute>} />
 
                         {/* Employer — Protected */}
@@ -55,6 +58,7 @@ export default function App() {
                         <Route path="/employer/challenges" element={<ProtectedRoute><EmployerChallenges /></ProtectedRoute>} />
                         <Route path="/employer/submissions" element={<ProtectedRoute><EmployerSubmissions /></ProtectedRoute>} />
                         <Route path="/employer/messages" element={<ProtectedRoute><EmployerMessages /></ProtectedRoute>} />
+                        <Route path="/employer/profile" element={<ProtectedRoute><EmployerProfile /></ProtectedRoute>} />
                         <Route path="/employer/create-challenge" element={<ProtectedRoute><ChallengeCreation /></ProtectedRoute>} />
                         <Route path="/employer/review/:submissionId" element={<ProtectedRoute><SubmissionReview /></ProtectedRoute>} />
                     </Routes>

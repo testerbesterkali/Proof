@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, Bell, LogOut, Plus, ArrowRight } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, Bell, LogOut, Plus, ArrowRight, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
@@ -18,6 +18,7 @@ export function EmployerLayout({ children }: LayoutProps) {
         { icon: Briefcase, path: '/employer/challenges', label: 'Challenges' },
         { icon: Users, path: '/employer/submissions', label: 'Submissions' },
         { icon: MessageSquare, path: '/employer/messages', label: 'Messages' },
+        { icon: Building2, path: '/employer/profile', label: 'Profile' },
     ];
 
     const currentPath = location.pathname;

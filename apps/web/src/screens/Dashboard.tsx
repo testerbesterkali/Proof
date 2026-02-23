@@ -10,6 +10,9 @@ export function Dashboard() {
     const [loading, setLoading] = React.useState(true);
     const [challenges, setChallenges] = React.useState<any[]>([]);
     const [stats, setStats] = React.useState({ companies: 0, proofs: 0, hired: 0 });
+    const [isVerified, setIsVerified] = React.useState(false);
+    const [aiScore, setAiScore] = React.useState<number | null>(null);
+    const [metadata, setMetadata] = React.useState<any>(null);
 
     React.useEffect(() => {
         loadDashboardData();
@@ -51,6 +54,25 @@ export function Dashboard() {
                         .eq('userId', user.id);
                     const candidateId = profiles?.[0]?.id;
                     if (candidateId) {
+                        // Check if verified (at least one submission)
+                        const { data: latestSubmission } = await supabase
+                            .from('Submission')
+                            .select('*')
+                            .eq('candidateId', candidateId)
+                            .order('createdAt', { ascending: false })
+                            .limit(1)
+                            .single();
+
+                        if (latestSubmission) {
+                            setIsVerified(true);
+                            setAiScore(latestSubmission.aiScore);
+                            setMetadata(latestSubmission.score);
+                        } else {
+                            setIsVerified(false);
+                            setAiScore(null);
+                            setMetadata(null);
+                        }
+
                         const { data: userSubmissions } = await supabase
                             .from('Submission')
                             .select('challengeId')
@@ -171,20 +193,33 @@ export function Dashboard() {
                                     className="col-span-1 md:col-span-2 bg-white/60 backdrop-blur-2xl p-6 rounded-[2.5rem] shadow-glass border border-white flex items-center justify-between"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="w-14 h-14 rounded-2xl bg-proof-accent/10 flex items-center justify-center text-proof-accent shadow-inner">
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isVerified ? 'bg-proof-accent/10 text-proof-accent' : 'bg-[#1C1C1E]/5 text-[#1C1C1E]/20'}`}>
                                             <ShieldCheck size={28} strokeWidth={2.5} />
                                         </div>
                                         <div>
                                             <h4 className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40 mb-1">Status</h4>
-                                            <p className="text-lg font-black tracking-tight leading-none uppercase">Proof Verified</p>
+                                            <p className="text-lg font-black tracking-tight leading-none uppercase">{isVerified ? (metadata?.language ? `${metadata.language} Proficient` : 'Proof Verified') : 'Not Verified'}</p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1 flex items-center justify-end gap-1">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Live Now
+                                    {isVerified ? (
+                                        <div className="text-right">
+                                            <div className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1 flex items-center justify-end gap-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Live Now
+                                            </div>
+                                            <p className="text-[10px] font-bold text-[#1C1C1E]/30 uppercase tracking-widest">Global Discovery</p>
                                         </div>
-                                        <p className="text-[10px] font-bold text-[#1C1C1E]/30 uppercase tracking-widest">Global Discovery</p>
-                                    </div>
+                                    ) : (
+                                        <div className="text-right">
+                                            <motion.button
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() => window.location.href = '/upload'}
+                                                className="bg-proof-accent text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-proof-accent/20"
+                                            >
+                                                Record Proof
+                                            </motion.button>
+                                        </div>
+                                    )}
                                 </motion.div>
 
                                 {/* Match Confidence Card */}
@@ -201,7 +236,7 @@ export function Dashboard() {
                                         <ArrowUpRight size={20} className="text-[#1C1C1E]/20" />
                                     </div>
                                     <div>
-                                        <div className="text-5xl font-black tracking-tighter mb-1">94%</div>
+                                        <div className="text-5xl font-black tracking-tighter mb-1">{isVerified && aiScore ? `${aiScore}%` : '—'}</div>
                                         <h4 className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40">Match Confidence</h4>
                                     </div>
                                 </motion.div>
