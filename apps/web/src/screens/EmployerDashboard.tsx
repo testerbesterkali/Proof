@@ -99,7 +99,7 @@ export function EmployerDashboard() {
         <EmployerLayout>
             <div className="flex-1 flex flex-col">
                 {/* HERO AND CHART SECTION */}
-                <section className="flex flex-col lg:flex-row justify-between mb-20 relative z-10">
+                <section className="flex flex-col lg:flex-row justify-between mb-8 relative z-10">
                     <motion.div
                         initial={{ opacity: 0, x: -30 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -250,7 +250,7 @@ export function EmployerDashboard() {
                 </section>
 
                 {/* CHALLENGES LIST - Candidate Style Grid */}
-                <section className="mt-8 pt-1">
+                <section className="mt-2 pt-1">
                     <div className="flex items-center justify-between mb-8">
                         <h2 className="text-2xl font-black tracking-tighter uppercase px-1">Your Challenges</h2>
                         <div className="flex items-center gap-6 text-[11px] font-black tracking-widest uppercase">
@@ -287,7 +287,7 @@ export function EmployerDashboard() {
                                     initial={{ opacity: 0, y: 30 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.2 + (0.1 * i), type: "spring" }}
-                                    onClick={() => (window.location.href = `/employer/review/${c.id}`)}
+                                    onClick={() => (window.location.href = `/employer/submissions?challengeId=${c.id}`)}
                                     className="group bg-white/40 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-glass-soft border border-white/60 flex flex-col justify-between min-w-[280px] hover:shadow-glass hover:bg-white/80 transition-all cursor-pointer relative overflow-hidden"
                                 >
                                     <div className="absolute top-[-10px] left-[-10px] w-20 h-20 bg-proof-accent opacity-0 group-hover:opacity-5 blur-[40px] transition-all" />
@@ -313,8 +313,8 @@ export function EmployerDashboard() {
 
                                         <div className="flex flex-col gap-1.5 items-end">
                                             <div className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest ${c.status === 'ACTIVE' || c.status === 'active' || c.status === 'OPEN'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-gray-100 text-gray-700'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-gray-100 text-gray-700'
                                                 }`}>
                                                 {c.status}
                                             </div>

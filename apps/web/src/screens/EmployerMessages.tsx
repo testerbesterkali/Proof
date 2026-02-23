@@ -1,9 +1,10 @@
 import * as React from 'react';
-import { motion } from 'framer-motion';
-import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCircle2, LogOut } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutDashboard, Briefcase, Users, MessageSquare, Search, Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCircle2, LogOut, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { EmployerLayout } from '../components/EmployerLayout';
 
 interface Message {
     id: string;
@@ -25,6 +26,7 @@ interface Conversation {
 
 export function EmployerMessages() {
     const { user, signOut } = useAuth();
+    const [loading, setLoading] = React.useState(true);
     const [conversations, setConversations] = React.useState<Conversation[]>([]);
     const [selectedConvo, setSelectedConvo] = React.useState<Conversation | null>(null);
     const [messages, setMessages] = React.useState<Message[]>([]);
@@ -38,6 +40,7 @@ export function EmployerMessages() {
 
     const loadConversations = async () => {
         if (!user) return;
+        setLoading(true);
         try {
             // 1. Fetch all messages involving the current employer
             const { data: messageData, error: msgError } = await supabase
@@ -50,7 +53,6 @@ export function EmployerMessages() {
 
             const allMessages = messageData as Message[];
             if (!allMessages.length) {
-                // Mock conversation if none exist so the UI isn't completely empty during demo testing
                 setConversations([
                     {
                         id: 'mock-candidate-123',
@@ -61,20 +63,18 @@ export function EmployerMessages() {
                         lastMessage: 'Waiting for a challenge...'
                     }
                 ]);
+                setLoading(false);
                 return;
             }
 
-            // 2. Identify unique partner IDs and last messages
             const partnerIds = new Set<string>();
             const lastMessageMap = new Map<string, string>();
             allMessages.forEach(m => {
                 const partnerId = m.senderId === user.id ? m.receiverId : m.senderId;
                 partnerIds.add(partnerId);
-                // Since messages are sorted ascending, the last one processed is the latest
                 lastMessageMap.set(partnerId, m.content);
             });
 
-            // 3. Fetch Candidate Profiles for these userIds to get their profile ID as a pseudo-name
             const { data: candidates, error: candError } = await supabase
                 .from('CandidateProfile')
                 .select('id, userId')
@@ -97,20 +97,18 @@ export function EmployerMessages() {
             }));
 
             setConversations(loadedConvos);
-
             if (loadedConvos.length > 0 && !selectedConvo) {
                 setSelectedConvo(loadedConvos[0]);
             }
-
         } catch (err) {
             console.error('Error loading conversations:', err);
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Load messages for selected conversation
     React.useEffect(() => {
         if (!user || !selectedConvo) return;
-
         const loadSelectedMessages = async () => {
             const { data } = await supabase
                 .from('Message')
@@ -120,36 +118,18 @@ export function EmployerMessages() {
 
             if (data) setMessages(data as Message[]);
         };
-
         loadSelectedMessages();
 
-        // Subscribe to real-time incoming messages
         const channel = supabase.channel(`messages:${user.id}:${selectedConvo.id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'Message',
-                },
-                (payload) => {
-                    const newMsg = payload.new as Message;
-                    if (
-                        (newMsg.senderId === user.id && newMsg.receiverId === selectedConvo.id) ||
-                        (newMsg.senderId === selectedConvo.id && newMsg.receiverId === user.id)
-                    ) {
-                        setMessages((prev) => {
-                            if (prev.find(m => m.id === newMsg.id)) return prev;
-                            return [...prev, newMsg];
-                        });
-                    }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Message' }, (payload) => {
+                const newMsg = payload.new as Message;
+                if ((newMsg.senderId === user.id && newMsg.receiverId === selectedConvo.id) ||
+                    (newMsg.senderId === selectedConvo.id && newMsg.receiverId === user.id)) {
+                    setMessages((prev) => prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
                 }
-            )
-            .subscribe();
+            }).subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(channel); };
     }, [user, selectedConvo]);
 
     React.useEffect(() => {
@@ -159,98 +139,59 @@ export function EmployerMessages() {
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedConvo || !user) return;
-
         const content = newMessage;
         setNewMessage('');
-
-        const msgData = {
-            id: crypto.randomUUID(),
-            senderId: user.id,
-            receiverId: selectedConvo.id,
-            content,
-            isRead: false
-        };
-
-        // Optimistic UI update
+        const msgData = { id: crypto.randomUUID(), senderId: user.id, receiverId: selectedConvo.id, content, isRead: false };
         setMessages(prev => [...prev, { ...msgData, createdAt: new Date().toISOString() }]);
-
         try {
             const { error } = await supabase.from('Message').insert(msgData);
             if (error) throw error;
-        } catch (err) {
-            console.error('Failed to send message:', err);
-        }
+        } catch (err) { console.error('Failed to send message:', err); }
     };
 
     return (
-        <div className="w-full min-h-screen flex text-[#1C1C1E] bg-[#E4E5E7] font-sans">
-            {/* SIDEBAR */}
-            <aside className="w-64 fixed h-full bg-white border-r border-[#1C1C1E]/5 flex flex-col p-8 z-30">
-                <div className="flex items-center gap-3 mb-12">
-                    <div className="w-10 h-10 bg-[#1C1C1E] text-white rounded-xl flex items-center justify-center text-xl font-black">P</div>
-                    <span className="font-black tracking-tighter text-xl">PROOF</span>
-                </div>
-
-                <nav className="flex flex-col gap-2">
-                    <Link to="/employer/dashboard" className="flex items-center gap-3 px-4 py-3 text-[#1C1C1E]/40 hover:text-[#1C1C1E] hover:bg-[#1C1C1E]/5 rounded-2xl font-bold text-sm transition-all">
-                        <LayoutDashboard size={18} /> Dashboard
-                    </Link>
-                    <Link to="/employer/challenges" className="flex items-center gap-3 px-4 py-3 text-[#1C1C1E]/40 hover:text-[#1C1C1E] hover:bg-[#1C1C1E]/5 rounded-2xl font-bold text-sm transition-all">
-                        <Briefcase size={18} /> Challenges
-                    </Link>
-                    <Link to="/employer/submissions" className="flex items-center gap-3 px-4 py-3 text-[#1C1C1E]/40 hover:text-[#1C1C1E] hover:bg-[#1C1C1E]/5 rounded-2xl font-bold text-sm transition-all">
-                        <Users size={18} /> Submissions
-                    </Link>
-                    <Link to="/employer/messages" className="flex items-center gap-3 px-4 py-3 bg-[#1C1C1E]/5 text-[#1C1C1E] rounded-2xl font-bold text-sm">
-                        <MessageSquare size={18} /> Messages
-                    </Link>
-                </nav>
-
-                <div className="mt-auto">
-                    <button onClick={() => signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-500 hover:bg-red-50 rounded-2xl font-bold text-sm transition-all shadow-sm bg-white border border-red-100">
-                        <LogOut size={18} /> Sign Out
-                    </button>
-                </div>
-            </aside>
-
-            {/* MAIN CONTENT */}
-            <main className="flex-1 ml-64 p-8 flex flex-col h-screen">
-                <div className="bg-white rounded-[3rem] shadow-soft border border-white flex-1 overflow-hidden flex">
-
+        <EmployerLayout>
+            <div className="flex-1 flex flex-col h-[calc(100vh-140px)]">
+                <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] shadow-glass-soft border border-white flex-1 overflow-hidden flex">
                     {/* Conversations List */}
-                    <div className="w-80 border-r border-[#1C1C1E]/5 flex flex-col bg-[#F8F9FB]/50">
+                    <div className="w-80 border-r border-white/60 flex flex-col bg-white/20">
                         <div className="p-8 pb-4">
-                            <h2 className="text-2xl font-black tracking-tighter mb-6">MESSAGES</h2>
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1C1C1E]/30" size={16} />
+                            <h2 className="text-2xl font-black tracking-tighter mb-6 uppercase">Talent Inbound</h2>
+                            <div className="relative group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1C1C1E]/20 group-focus-within:text-proof-accent transition-colors" size={16} />
                                 <input
                                     type="text"
                                     placeholder="Search candidates..."
-                                    className="w-full bg-white border border-transparent focus:border-[#1C1C1E]/10 rounded-2xl py-3 pl-12 pr-4 text-sm font-bold shadow-sm transition-all focus:outline-none"
+                                    className="w-full bg-white/40 border border-transparent focus:border-proof-accent/20 rounded-2xl py-3 pl-12 pr-4 text-xs font-bold shadow-sm transition-all focus:outline-none"
                                 />
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-                            {conversations.map((convo) => (
+                            {loading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-6 h-6 animate-spin text-proof-accent/40" />
+                                </div>
+                            ) : conversations.map((convo) => (
                                 <button
                                     key={convo.id}
                                     onClick={() => setSelectedConvo(convo)}
                                     className={`w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-left ${selectedConvo?.id === convo.id
-                                        ? 'bg-white shadow-soft border border-white scale-[1.02]'
-                                        : 'hover:bg-white/60 border border-transparent hover:border-white'
+                                        ? 'bg-white shadow-glass border border-white scale-[1.02]'
+                                        : 'hover:bg-white/40 border border-transparent hover:border-white'
                                         }`}
                                 >
                                     <div className="relative">
-                                        <img src={convo.avatar} alt={convo.name} className="w-12 h-12 rounded-2xl object-cover" />
-                                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${convo.status === 'online' ? 'bg-green-500' : 'bg-gray-300'
-                                            }`} />
+                                        <div className="w-12 h-12 rounded-2xl bg-white border border-[#1C1C1E]/5 flex items-center justify-center overflow-hidden shadow-sm">
+                                            <img src={convo.avatar} alt={convo.name} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${convo.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}`} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-bold text-sm truncate">{convo.name}</h4>
-                                        </div>
-                                        <p className={`text-xs truncate font-medium mt-0.5 ${selectedConvo?.id === convo.id ? 'text-[#1C1C1E]' : 'text-[#1C1C1E]/40'}`}>{convo.lastMessage}</p>
+                                        <h4 className="font-black text-sm truncate uppercase tracking-tight">{convo.name}</h4>
+                                        <p className={`text-[10px] truncate font-bold uppercase tracking-widest mt-0.5 ${selectedConvo?.id === convo.id ? 'text-[#1C1C1E]' : 'text-[#1C1C1E]/40'}`}>
+                                            {convo.lastMessage || 'No messages yet'}
+                                        </p>
                                     </div>
                                 </button>
                             ))}
@@ -259,67 +200,74 @@ export function EmployerMessages() {
 
                     {/* Chat Area */}
                     {selectedConvo ? (
-                        <div className="flex-1 flex flex-col bg-white">
+                        <div className="flex-1 flex flex-col bg-white/40">
                             {/* Chat Header */}
-                            <header className="px-8 py-6 border-b border-[#1C1C1E]/5 flex items-center justify-between">
+                            <header className="px-8 py-6 border-b border-white flex items-center justify-between bg-white/40 backdrop-blur-md">
                                 <div className="flex items-center gap-4">
-                                    <img src={selectedConvo.avatar} alt={selectedConvo.name} className="w-12 h-12 rounded-2xl object-cover" />
+                                    <div className="w-12 h-12 rounded-2xl bg-white border border-[#1C1C1E]/5 flex items-center justify-center overflow-hidden shadow-sm">
+                                        <img src={selectedConvo.avatar} alt={selectedConvo.name} className="w-full h-full object-cover" />
+                                    </div>
                                     <div>
-                                        <h3 className="font-black text-lg tracking-tight">{selectedConvo.name}</h3>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-[#1C1C1E]/40">{selectedConvo.role}</p>
+                                        <h3 className="font-black text-lg tracking-tight uppercase">{selectedConvo.name}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-proof-accent">Candidate verified</span>
+                                            <div className="w-1 h-1 rounded-full bg-[#1C1C1E]/20" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-[#1C1C1E]/30">Active now</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button className="w-10 h-10 rounded-full hover:bg-[#1C1C1E]/5 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-colors"><Phone size={18} /></button>
-                                    <button className="w-10 h-10 rounded-full hover:bg-[#1C1C1E]/5 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-colors"><Video size={18} /></button>
-                                    <button className="w-10 h-10 rounded-full hover:bg-[#1C1C1E]/5 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-colors"><MoreVertical size={18} /></button>
+                                <div className="flex items-center gap-3">
+                                    <button className="w-10 h-10 rounded-xl bg-white border border-black/5 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-all shadow-sm"><Phone size={18} /></button>
+                                    <button className="w-10 h-10 rounded-xl bg-white border border-black/5 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-all shadow-sm"><Video size={18} /></button>
+                                    <button className="w-10 h-10 rounded-xl bg-white border border-black/5 flex items-center justify-center text-[#1C1C1E]/40 hover:text-[#1C1C1E] transition-all shadow-sm"><MoreVertical size={18} /></button>
                                 </div>
                             </header>
 
                             {/* Messages */}
-                            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[#F8F9FB]/30">
-                                <div className="flex-1" />
-                                {messages.map((msg, idx) => {
-                                    const isMe = msg.senderId === user?.id;
-                                    return (
-                                        <motion.div
-                                            key={msg.id}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: idx * 0.05 }}
-                                            className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                                        >
-                                            <div className={`max-w-[70%] p-5 rounded-3xl ${isMe
-                                                ? 'bg-[#1C1C1E] text-white rounded-tr-sm'
-                                                : 'bg-white border border-[#1C1C1E]/5 text-[#1C1C1E] rounded-tl-sm shadow-sm'
-                                                }`}>
-                                                <p className="font-medium text-[15px] leading-relaxed">{msg.content}</p>
-                                                <span className={`text-[10px] font-bold mt-2 block ${isMe ? 'text-white/40' : 'text-[#1C1C1E]/30'}`}>
-                                                    {msg.createdAt && new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-                                        </motion.div>
-                                    );
-                                })}
+                            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                                <AnimatePresence initial={false}>
+                                    {messages.map((msg, idx) => {
+                                        const isMe = msg.senderId === user?.id;
+                                        return (
+                                            <motion.div
+                                                key={msg.id}
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                <div className={`max-w-[70%] p-5 rounded-[2rem] shadow-glass-soft ${isMe
+                                                    ? 'bg-[#1C1C1E] text-white rounded-tr-sm'
+                                                    : 'bg-white border border-white text-[#1C1C1E] rounded-tl-sm'
+                                                    }`}>
+                                                    <p className="font-medium text-[14px] leading-relaxed">{msg.content}</p>
+                                                    <div className={`text-[8px] font-black uppercase tracking-widest mt-2 flex items-center gap-2 ${isMe ? 'text-white/40' : 'text-[#1C1C1E]/30'}`}>
+                                                        {msg.createdAt && new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        {isMe && <CheckCircle2 size={10} />}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </AnimatePresence>
                                 <div ref={scrollRef} />
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-6 bg-white border-t border-[#1C1C1E]/5">
-                                <form onSubmit={handleSendMessage} className="flex items-center gap-4 bg-[#F8F9FB] border border-[#1C1C1E]/5 p-2 rounded-full pl-6 focus-within:border-[#1C1C1E]/20 focus-within:shadow-sm transition-all opacity-100">
+                            <div className="p-6 bg-white/40 border-t border-white">
+                                <form onSubmit={handleSendMessage} className="flex items-center gap-4 bg-white/60 backdrop-blur-md border border-white p-2 rounded-full pl-6 focus-within:border-proof-accent/20 shadow-soft transition-all">
                                     <button type="button" className="text-[#1C1C1E]/30 hover:text-[#1C1C1E] transition-colors"><Smile size={20} /></button>
                                     <button type="button" className="text-[#1C1C1E]/30 hover:text-[#1C1C1E] transition-colors"><Paperclip size={20} /></button>
                                     <input
                                         type="text"
-                                        placeholder="Type a message..."
+                                        placeholder="Type a message to the candidate..."
                                         value={newMessage}
                                         onChange={(e) => setNewMessage(e.target.value)}
-                                        className="flex-1 bg-transparent py-3 px-2 focus:outline-none font-medium text-[15px]"
+                                        className="flex-1 bg-transparent py-3 px-2 focus:outline-none font-bold text-sm"
                                     />
                                     <button
                                         type="submit"
                                         disabled={!newMessage.trim()}
-                                        className="w-12 h-12 bg-[#1C1C1E] text-white rounded-full flex items-center justify-center shadow-md hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition-all"
+                                        className="w-12 h-12 bg-[#1C1C1E] text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition-all"
                                     >
                                         <Send size={18} className="translate-x-0.5" />
                                     </button>
@@ -327,16 +275,16 @@ export function EmployerMessages() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center bg-[#F8F9FB]/30">
-                            <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center mb-6">
-                                <MessageSquare className="w-8 h-8 text-[#1C1C1E]/20" />
+                        <div className="flex-1 flex flex-col items-center justify-center bg-white/20">
+                            <div className="w-24 h-24 bg-white/40 rounded-[2.5rem] shadow-glass border border-white flex items-center justify-center mb-8">
+                                <MessageSquare className="w-10 h-10 text-proof-accent/20" />
                             </div>
-                            <h3 className="text-xl font-black tracking-tight mb-2">Select a conversation</h3>
-                            <p className="text-[#1C1C1E]/40 font-bold text-sm">Choose a candidate from the list to start messaging.</p>
+                            <h3 className="text-2xl font-black tracking-tight uppercase mb-2">Select a conversation</h3>
+                            <p className="text-[#1C1C1E]/40 font-bold text-sm uppercase tracking-widest">Connect with your top talent pool</p>
                         </div>
                     )}
                 </div>
-            </main>
-        </div>
+            </div>
+        </EmployerLayout>
     );
 }
