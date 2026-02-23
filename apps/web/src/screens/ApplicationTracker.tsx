@@ -5,7 +5,7 @@ import { Clock, MessageSquare, ChevronRight, Building2, ExternalLink, XCircle, C
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
-type Stage = 'applied' | 'reviewing' | 'challenge' | 'interviewing' | 'decision';
+type Stage = 'under_review' | 'shortlisted' | 'interview' | 'decision';
 
 interface Application {
     id: string;
@@ -20,22 +20,24 @@ interface Application {
 
 function mapStatusToStage(status: string): Stage {
     switch (status) {
-        case 'SUBMITTED': return 'applied';
-        case 'UNDER_REVIEW': return 'reviewing';
-        case 'IN_PROGRESS': return 'challenge';
-        case 'REVIEWED': return 'interviewing';
+        case 'SUBMITTED': return 'under_review';
+        case 'UNDER_REVIEW': return 'under_review';
+        case 'SHORTLISTED': return 'shortlisted';
+        case 'INTERVIEW': return 'interview';
+        case 'REVIEWED': return 'under_review';
         case 'ACCEPTED': return 'decision';
         case 'REJECTED': return 'decision';
-        default: return 'applied';
+        default: return 'under_review';
     }
 }
 
 function getNextAction(status: string, score: any): string {
     switch (status) {
-        case 'SUBMITTED': return 'Awaiting employer review';
-        case 'UNDER_REVIEW': return 'Proof under review';
-        case 'IN_PROGRESS': return 'Complete coding challenge';
-        case 'REVIEWED': return score ? `AI Score: ${score.overall}/100` : 'Review completed';
+        case 'SUBMITTED': return 'Proof under review';
+        case 'UNDER_REVIEW': return score ? `AI Score: ${score.overall}/100` : 'Proof under review';
+        case 'SHORTLISTED': return 'Shortlisted by employer';
+        case 'INTERVIEW': return 'Interview scheduled';
+        case 'REVIEWED': return score ? `AI Score: ${score.overall}/100` : 'Proof under review';
         case 'ACCEPTED': return 'Offer received!';
         case 'REJECTED': return 'Not selected';
         default: return 'Proof submitted';
@@ -49,11 +51,10 @@ function getDaysAgo(dateStr: string): number {
 }
 
 const columns: { key: Stage; label: string; icon: React.ElementType; color: string }[] = [
-    { key: 'applied', label: 'Applied', icon: ExternalLink, color: 'text-blue-500 bg-blue-50' },
-    { key: 'reviewing', label: 'Under Review', icon: Eye, color: 'text-purple-500 bg-purple-50' },
-    { key: 'challenge', label: 'Challenge', icon: AlertCircle, color: 'text-amber-500 bg-amber-50' },
-    { key: 'interviewing', label: 'Interviewing', icon: MessageSquare, color: 'text-cyan-500 bg-cyan-50' },
-    { key: 'decision', label: 'Decision', icon: CheckCircle, color: 'text-green-500 bg-green-50' },
+    { key: 'under_review', label: 'Under Review', icon: Eye, color: 'text-blue-500 bg-blue-50' },
+    { key: 'shortlisted', label: 'Shortlisted', icon: CheckCircle, color: 'text-purple-500 bg-purple-50' },
+    { key: 'interview', label: 'Interview', icon: MessageSquare, color: 'text-cyan-500 bg-cyan-50' },
+    { key: 'decision', label: 'Decision', icon: AlertCircle, color: 'text-green-500 bg-green-50' },
 ];
 
 function AppCard({ app }: { app: Application }) {

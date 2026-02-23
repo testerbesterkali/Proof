@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Clock, MapPin, Zap, ArrowRight, Share2, Bookmark, X, Users, DollarSign, Code, CheckCircle, ExternalLink, Calendar, Loader2 } from 'lucide-react';
+import { Search, Filter, Clock, MapPin, Zap, ArrowRight, Share2, Bookmark, X, Users, DollarSign, Code, CheckCircle, ExternalLink, Calendar, Loader2, Trophy, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -48,11 +48,14 @@ function getDeadline(createdAt: string): string {
 export function ChallengeDiscovery() {
     const navigate = useNavigate();
     const [challenges, setChallenges] = useState<Challenge[]>([]);
+    const [completedChallenges, setCompletedChallenges] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [showFilters, setShowFilters] = useState(false);
     const [proctoringChallenge, setProctoringChallenge] = useState<Challenge | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [challengeTab, setChallengeTab] = useState<'active' | 'completed'>('active');
+    const [selectedCompleted, setSelectedCompleted] = useState<any | null>(null);
 
     useEffect(() => {
         loadChallenges();
@@ -104,7 +107,7 @@ export function ChallengeDiscovery() {
                     role: c.jobRole || c.type || 'Engineer',
                     type: c.type || 'Code',
                     prize: c.prizeAmount > 0 ? `$${c.prizeAmount.toLocaleString()}` : 'Experience',
-                    match: Math.floor(Math.random() * 15) + 85,
+                    match: 85 + (c.id.charCodeAt(0) + c.id.charCodeAt(1)) % 15,
                     fast: (c.timeLimitMins || 0) <= 60,
                     description: c.description,
                     skills: c.requiredSkills || [],
@@ -114,7 +117,57 @@ export function ChallengeDiscovery() {
                 };
             });
 
-            setChallenges(formatted);
+            // Fetch completed challenges (user's submissions)
+            let completedChallengeIds = new Set<string>();
+            try {
+                const { data: profiles } = await supabase
+                    .from('CandidateProfile')
+                    .select('id')
+                    .eq('userId', (await supabase.auth.getUser()).data.user?.id || '');
+                const candidateId = profiles?.[0]?.id;
+                if (candidateId) {
+                    const { data: submissions } = await supabase
+                        .from('Submission')
+                        .select('*')
+                        .eq('candidateId', candidateId)
+                        .order('createdAt', { ascending: false });
+
+                    if (submissions && submissions.length > 0) {
+                        completedChallengeIds = new Set(submissions.map(s => s.challengeId));
+                        const subChallengeIds = [...completedChallengeIds];
+                        const { data: subChallenges } = await supabase
+                            .from('Challenge')
+                            .select('*')
+                            .in('id', subChallengeIds);
+
+                        const chalMap = new Map(subChallenges?.map(c => [c.id, c]) || []);
+
+                        const completed = submissions.map(sub => {
+                            const ch = chalMap.get(sub.challengeId);
+                            const emp = empMap.get(ch?.employerId || '');
+                            return {
+                                id: sub.id,
+                                challengeId: sub.challengeId,
+                                title: ch?.title || 'Challenge',
+                                company: emp?.companyName || 'Company',
+                                description: ch?.description || '',
+                                score: sub.score || null,
+                                status: sub.status,
+                                submittedAt: sub.createdAt,
+                                skills: ch?.requiredSkills || [],
+                                difficulty: getDifficulty(ch?.timeLimitMins),
+                                language: sub.content?.language || 'javascript',
+                            };
+                        });
+                        setCompletedChallenges(completed);
+                    }
+                }
+            } catch (compErr) {
+                console.error('Failed to load completed:', compErr);
+            }
+
+            // Filter out completed challenges from active list
+            setChallenges(formatted.filter(c => !completedChallengeIds.has(c.id)));
         } catch (err) {
             console.error('Failed to load challenges:', err);
         } finally {
@@ -378,116 +431,374 @@ export function ChallengeDiscovery() {
                         )}
                     </AnimatePresence>
 
-                    {/* Grid */}
-                    {loading ? (
-                        <div className="flex items-center justify-center py-24">
-                            <Loader2 className="w-8 h-8 animate-spin text-[#1C1C1E]/20" />
-                        </div>
-                    ) : challenges.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-24 text-[#1C1C1E]/40">
-                            <Code className="w-16 h-16 mb-4 opacity-20" />
-                            <h2 className="text-2xl font-bold tracking-tight mb-2">No Challenges Yet</h2>
-                            <p className="text-sm font-medium">Check back soon — employers are creating new challenges.</p>
-                        </div>
+                    {/* Tabs */}
+                    <div className="flex gap-1 mb-6 bg-black/5 p-1 rounded-xl w-fit">
+                        <button
+                            onClick={() => setChallengeTab('active')}
+                            className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${challengeTab === 'active' ? 'bg-white text-[#1C1C1E] shadow-sm' : 'text-[#1C1C1E]/40 hover:text-[#1C1C1E]/60'}`}
+                        >
+                            Active Challenges
+                        </button>
+                        <button
+                            onClick={() => setChallengeTab('completed')}
+                            className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${challengeTab === 'completed' ? 'bg-white text-[#1C1C1E] shadow-sm' : 'text-[#1C1C1E]/40 hover:text-[#1C1C1E]/60'}`}
+                        >
+                            <Trophy size={12} />
+                            Completed
+                            {completedChallenges.length > 0 && (
+                                <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md text-[9px] font-black">{completedChallenges.length}</span>
+                            )}
+                        </button>
+                    </div>
+
+                    {challengeTab === 'active' ? (
+                        <>
+                            {/* Grid */}
+                            {loading ? (
+                                <div className="flex items-center justify-center py-24">
+                                    <Loader2 className="w-8 h-8 animate-spin text-[#1C1C1E]/20" />
+                                </div>
+                            ) : challenges.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-24 text-[#1C1C1E]/40">
+                                    <Code className="w-16 h-16 mb-4 opacity-20" />
+                                    <h2 className="text-2xl font-bold tracking-tight mb-2">No Challenges Yet</h2>
+                                    <p className="text-sm font-medium">Check back soon — employers are creating new challenges.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {challenges.filter(c => {
+                                        const q = searchQuery.toLowerCase();
+                                        if (q && !c.title.toLowerCase().includes(q) && !c.company.toLowerCase().includes(q) && !c.type.toLowerCase().includes(q)) return false;
+                                        if (filterType.length > 0 && !filterType.some(ft => c.type.toLowerCase().includes(ft.toLowerCase()))) return false;
+                                        if (filterDifficulty.length > 0 && !filterDifficulty.includes(c.difficulty)) return false;
+                                        if (filterSkills.length > 0 && !filterSkills.some(fs => c.skills.some(sk => sk.toLowerCase().includes(fs.toLowerCase())))) return false;
+                                        return true;
+                                    }).map((challenge, i) => (
+                                        <motion.div
+                                            key={challenge.id}
+                                            initial={{ opacity: 0, y: 15 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: i * 0.06 }}
+                                            onClick={() => setSelectedChallenge(challenge)}
+                                            className={`group bg-white/60 backdrop-blur-2xl rounded-2xl p-6 border border-white shadow-glass hover:shadow-xl hover:bg-white transition-all cursor-pointer relative overflow-hidden aspect-square flex flex-col ${selectedChallenge?.id === challenge.id ? 'ring-2 ring-[#1C1C1E]' : ''}`}
+                                        >
+                                            {/* Top row */}
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="w-12 h-12 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center font-bold text-lg">
+                                                    {challenge.company[0]}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {challenge.fast && (
+                                                        <span className="bg-proof-accent/10 text-proof-accent px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                                            <Zap size={9} fill="currentColor" /> Rapid
+                                                        </span>
+                                                    )}
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold ${difficultyColor[challenge.difficulty]}`}>
+                                                        {challenge.difficulty}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 flex flex-col">
+                                                <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-proof-accent mb-1">{challenge.type}</p>
+                                                <h3 className="text-base font-bold tracking-tight leading-snug mb-1.5">{challenge.title}</h3>
+                                                <p className="text-xs text-[#1C1C1E]/40 font-medium mb-0.5">{challenge.company} · {challenge.role}</p>
+
+                                                {/* Short description */}
+                                                <p className="text-xs text-[#1C1C1E]/50 leading-relaxed font-medium line-clamp-2 mt-2 mb-3">
+                                                    {challenge.description}
+                                                </p>
+
+                                                {/* About company snippet */}
+                                                <div className="bg-[#F8F9FB] rounded-xl p-3 mb-3 border border-black/5">
+                                                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#1C1C1E]/25 mb-1">About {challenge.company}</p>
+                                                    <p className="text-[11px] text-[#1C1C1E]/40 leading-relaxed font-medium line-clamp-2">{challenge.companyAbout}</p>
+                                                </div>
+
+                                                {/* Skills */}
+                                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                                    {challenge.skills.slice(0, 3).map(skill => (
+                                                        <span key={skill} className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/50">
+                                                            {skill}
+                                                        </span>
+                                                    ))}
+                                                    {challenge.skills.length > 3 && (
+                                                        <span className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/30">
+                                                            +{challenge.skills.length - 3}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Meta */}
+                                                <div className="flex items-center gap-3 text-[10px] text-[#1C1C1E]/30 font-medium">
+                                                    <span className="flex items-center gap-1"><Clock size={10} /> {challenge.deadline}</span>
+                                                    <span className="flex items-center gap-1"><Users size={10} /> {challenge.participants}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Bottom */}
+                                            <div className="flex items-center justify-between mt-auto pt-4 border-t border-black/5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-green-600 flex items-center gap-1">
+                                                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                                                        {challenge.match}% match
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setProctoringChallenge(challenge);
+                                                    }}
+                                                    className="bg-[#1C1C1E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#1C1C1E]/80 transition-colors flex items-center gap-1.5"
+                                                >
+                                                    Start <ArrowRight size={14} />
+                                                </button>
+                                            </div>
+
+                                            {/* Hover decoration */}
+                                            <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-[#F8F9FB] rounded-full opacity-0 group-hover:opacity-30 transition-opacity" />
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     ) : (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                            {challenges.filter(c => {
-                                const q = searchQuery.toLowerCase();
-                                if (q && !c.title.toLowerCase().includes(q) && !c.company.toLowerCase().includes(q) && !c.type.toLowerCase().includes(q)) return false;
-                                if (filterType.length > 0 && !filterType.some(ft => c.type.toLowerCase().includes(ft.toLowerCase()))) return false;
-                                if (filterDifficulty.length > 0 && !filterDifficulty.includes(c.difficulty)) return false;
-                                if (filterSkills.length > 0 && !filterSkills.some(fs => c.skills.some(sk => sk.toLowerCase().includes(fs.toLowerCase())))) return false;
-                                return true;
-                            }).map((challenge, i) => (
-                                <motion.div
-                                    key={challenge.id}
-                                    initial={{ opacity: 0, y: 15 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.06 }}
-                                    onClick={() => setSelectedChallenge(challenge)}
-                                    className={`group bg-white/60 backdrop-blur-2xl rounded-2xl p-6 border border-white shadow-glass hover:shadow-xl hover:bg-white transition-all cursor-pointer relative overflow-hidden aspect-square flex flex-col ${selectedChallenge?.id === challenge.id ? 'ring-2 ring-[#1C1C1E]' : ''}`}
-                                >
-                                    {/* Top row */}
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="w-12 h-12 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center font-bold text-lg">
-                                            {challenge.company[0]}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {challenge.fast && (
-                                                <span className="bg-proof-accent/10 text-proof-accent px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
-                                                    <Zap size={9} fill="currentColor" /> Rapid
-                                                </span>
-                                            )}
-                                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold ${difficultyColor[challenge.difficulty]}`}>
-                                                {challenge.difficulty}
+                        /* Completed Challenges Tab */
+                        completedChallenges.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-[#1C1C1E]/40">
+                                <Trophy className="w-16 h-16 mb-4 opacity-20" />
+                                <h2 className="text-2xl font-bold tracking-tight mb-2">No Completed Challenges</h2>
+                                <p className="text-sm font-medium">Complete challenges to see them here.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                                {completedChallenges.map((c, i) => (
+                                    <motion.div
+                                        key={c.id}
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: i * 0.06 }}
+                                        onClick={() => setSelectedCompleted(c)}
+                                        className={`group bg-white/60 backdrop-blur-2xl rounded-2xl p-6 border border-white shadow-glass hover:shadow-xl hover:bg-white transition-all cursor-pointer relative overflow-hidden ${selectedCompleted?.id === c.id ? 'ring-2 ring-[#1C1C1E]' : ''}`}
+                                    >
+                                        {/* Completed badge */}
+                                        <div className="absolute top-4 right-4">
+                                            <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                                <CheckCircle size={10} /> Completed
                                             </span>
                                         </div>
-                                    </div>
 
-                                    {/* Info */}
-                                    <div className="flex-1 flex flex-col">
-                                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-proof-accent mb-1">{challenge.type}</p>
-                                        <h3 className="text-base font-bold tracking-tight leading-snug mb-1.5">{challenge.title}</h3>
-                                        <p className="text-xs text-[#1C1C1E]/40 font-medium mb-0.5">{challenge.company} · {challenge.role}</p>
-
-                                        {/* Short description */}
-                                        <p className="text-xs text-[#1C1C1E]/50 leading-relaxed font-medium line-clamp-2 mt-2 mb-3">
-                                            {challenge.description}
-                                        </p>
-
-                                        {/* About company snippet */}
-                                        <div className="bg-[#F8F9FB] rounded-xl p-3 mb-3 border border-black/5">
-                                            <p className="text-[9px] font-bold uppercase tracking-widest text-[#1C1C1E]/25 mb-1">About {challenge.company}</p>
-                                            <p className="text-[11px] text-[#1C1C1E]/40 leading-relaxed font-medium line-clamp-2">{challenge.companyAbout}</p>
+                                        <div className="w-12 h-12 rounded-xl bg-[#F8F9FB] border border-black/5 flex items-center justify-center font-bold text-lg mb-4">
+                                            {c.company[0]}
                                         </div>
+
+                                        <h3 className="text-base font-bold tracking-tight leading-snug mb-1">{c.title}</h3>
+                                        <p className="text-xs text-[#1C1C1E]/40 font-medium mb-4">{c.company}</p>
+
+                                        {/* Score */}
+                                        {c.score?.overall != null && (
+                                            <div className="bg-[#F8F9FB] rounded-xl p-4 mb-4 border border-black/5 text-center">
+                                                <p className="text-[9px] font-bold uppercase tracking-widest text-[#1C1C1E]/25 mb-1">AI Score</p>
+                                                <p className={`text-3xl font-black ${c.score.overall >= 80 ? 'text-green-600' : c.score.overall >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                    {c.score.overall}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Skills */}
                                         <div className="flex flex-wrap gap-1.5 mb-3">
-                                            {challenge.skills.slice(0, 3).map(skill => (
+                                            {c.skills.slice(0, 3).map((skill: string) => (
                                                 <span key={skill} className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/50">
                                                     {skill}
                                                 </span>
                                             ))}
-                                            {challenge.skills.length > 3 && (
-                                                <span className="bg-[#F8F9FB] border border-black/5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-[#1C1C1E]/30">
-                                                    +{challenge.skills.length - 3}
-                                                </span>
-                                            )}
                                         </div>
 
-                                        {/* Meta */}
-                                        <div className="flex items-center gap-3 text-[10px] text-[#1C1C1E]/30 font-medium">
-                                            <span className="flex items-center gap-1"><Clock size={10} /> {challenge.deadline}</span>
-                                            <span className="flex items-center gap-1"><Users size={10} /> {challenge.participants}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Bottom */}
-                                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-black/5">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-green-600 flex items-center gap-1">
-                                                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                                                {challenge.match}% match
+                                        {/* Status & date */}
+                                        <div className="flex items-center justify-between pt-4 border-t border-black/5">
+                                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${['UNDER_REVIEW', 'SUBMITTED', 'REVIEWED'].includes(c.status) ? 'bg-blue-50 text-blue-600' :
+                                                c.status === 'SHORTLISTED' ? 'bg-purple-50 text-purple-600' :
+                                                    c.status === 'INTERVIEW' ? 'bg-cyan-50 text-cyan-600' :
+                                                        c.status === 'ACCEPTED' ? 'bg-green-50 text-green-700' :
+                                                            c.status === 'REJECTED' ? 'bg-red-50 text-red-600' :
+                                                                'bg-gray-50 text-gray-600'
+                                                }`}>
+                                                {['UNDER_REVIEW', 'SUBMITTED', 'REVIEWED'].includes(c.status) ? 'Under Review' :
+                                                    c.status === 'SHORTLISTED' ? 'Shortlisted' :
+                                                        c.status === 'INTERVIEW' ? 'Interview' :
+                                                            c.status === 'ACCEPTED' ? 'Accepted' :
+                                                                c.status === 'REJECTED' ? 'Rejected' : c.status}
+                                            </span>
+                                            <span className="text-[10px] text-[#1C1C1E]/30 font-medium">
+                                                {new Date(c.submittedAt).toLocaleDateString()}
                                             </span>
                                         </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setProctoringChallenge(challenge);
-                                            }}
-                                            className="bg-[#1C1C1E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#1C1C1E]/80 transition-colors flex items-center gap-1.5"
-                                        >
-                                            Start <ArrowRight size={14} />
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )
+                    )}
+                </div>
+
+                {/* COMPLETED CHALLENGE DETAIL PANEL */}
+                <AnimatePresence>
+                    {selectedCompleted && (
+                        <>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setSelectedCompleted(null)}
+                                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+                            />
+                            <motion.div
+                                initial={{ x: '100%' }}
+                                animate={{ x: 0 }}
+                                exit={{ x: '100%' }}
+                                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                                className="fixed right-0 top-0 bottom-0 w-full max-w-xl bg-white shadow-2xl z-50 overflow-y-auto"
+                            >
+                                <div className="p-8">
+                                    {/* Header */}
+                                    <div className="flex items-start justify-between mb-6">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-proof-accent mb-1">Completed Challenge</p>
+                                            <h2 className="text-2xl font-bold tracking-tight">{selectedCompleted.title}</h2>
+                                            <p className="text-sm text-[#1C1C1E]/40 font-medium mt-1">{selectedCompleted.company} · {selectedCompleted.language}</p>
+                                        </div>
+                                        <button onClick={() => setSelectedCompleted(null)} className="p-2 rounded-xl hover:bg-black/5 text-[#1C1C1E]/30 hover:text-[#1C1C1E]">
+                                            <X size={20} />
                                         </button>
                                     </div>
 
-                                    {/* Hover decoration */}
-                                    <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-[#F8F9FB] rounded-full opacity-0 group-hover:opacity-30 transition-opacity" />
-                                </motion.div>
-                            ))}
-                        </div>
+                                    {/* Overall Score */}
+                                    {selectedCompleted.score?.overall != null && (
+                                        <div className="bg-gradient-to-br from-[#F8F9FB] to-white rounded-2xl p-8 border border-black/5 text-center mb-8">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1C1C1E]/25 mb-3">Overall AI Score</p>
+                                            <p className={`text-6xl font-black ${selectedCompleted.score.overall >= 80 ? 'text-green-600' : selectedCompleted.score.overall >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                {selectedCompleted.score.overall}
+                                                <span className="text-xl text-[#1C1C1E]/20 font-bold">/100</span>
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Score Breakdown */}
+                                    {selectedCompleted.score && (
+                                        <div className="mb-8">
+                                            <h3 className="text-sm font-bold tracking-tight mb-4">Score Breakdown</h3>
+                                            <div className="space-y-3">
+                                                {[
+                                                    { label: 'Correctness', key: 'correctness', icon: '✓' },
+                                                    { label: 'Completeness', key: 'completeness', icon: '📋' },
+                                                    { label: 'Code Quality', key: 'codeQuality', icon: '💎' },
+                                                    { label: 'Efficiency', key: 'efficiency', icon: '⚡' },
+                                                    { label: 'Best Practices', key: 'bestPractices', icon: '🛡️' },
+                                                ].map(({ label, key, icon }) => {
+                                                    const val = selectedCompleted.score?.[key];
+                                                    if (val == null) return null;
+                                                    return (
+                                                        <div key={key} className="flex items-center gap-3">
+                                                            <span className="text-sm w-6 text-center">{icon}</span>
+                                                            <span className="text-xs font-bold text-[#1C1C1E]/60 w-28">{label}</span>
+                                                            <div className="flex-1 h-2.5 bg-[#F8F9FB] rounded-full overflow-hidden">
+                                                                <motion.div
+                                                                    initial={{ width: 0 }}
+                                                                    animate={{ width: `${val}%` }}
+                                                                    transition={{ duration: 0.8, delay: 0.2 }}
+                                                                    className={`h-full rounded-full ${val >= 80 ? 'bg-green-500' : val >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                                />
+                                                            </div>
+                                                            <span className={`text-xs font-black w-10 text-right ${val >= 80 ? 'text-green-600' : val >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                                {val}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Summary */}
+                                    {selectedCompleted.score?.summary && (
+                                        <div className="mb-8">
+                                            <h3 className="text-sm font-bold tracking-tight mb-3">AI Summary</h3>
+                                            <p className="text-sm text-[#1C1C1E]/60 leading-relaxed bg-[#F8F9FB] rounded-xl p-5 border border-black/5">
+                                                {selectedCompleted.score.summary}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Strengths */}
+                                    {selectedCompleted.score?.strengths && selectedCompleted.score.strengths.length > 0 && (
+                                        <div className="mb-8">
+                                            <h3 className="text-sm font-bold tracking-tight mb-3 flex items-center gap-2">
+                                                <span className="text-green-500">✦</span> Strengths
+                                            </h3>
+                                            <div className="space-y-2">
+                                                {selectedCompleted.score.strengths.map((s: string, i: number) => (
+                                                    <div key={i} className="flex items-start gap-3 bg-green-50 rounded-xl p-4 border border-green-100">
+                                                        <CheckCircle size={14} className="text-green-500 shrink-0 mt-0.5" />
+                                                        <p className="text-xs text-green-800 leading-relaxed font-medium">{s}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Areas for Improvement */}
+                                    {selectedCompleted.score?.improvements && selectedCompleted.score.improvements.length > 0 && (
+                                        <div className="mb-8">
+                                            <h3 className="text-sm font-bold tracking-tight mb-3 flex items-center gap-2">
+                                                <span className="text-amber-500">▲</span> Areas for Improvement
+                                            </h3>
+                                            <div className="space-y-2">
+                                                {selectedCompleted.score.improvements.map((s: string, i: number) => (
+                                                    <div key={i} className="flex items-start gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
+                                                        <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                                                        <p className="text-xs text-amber-800 leading-relaxed font-medium">{s}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Skills */}
+                                    <div className="mb-8">
+                                        <h3 className="text-sm font-bold tracking-tight mb-3">Skills Tested</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedCompleted.skills.map((skill: string) => (
+                                                <span key={skill} className="bg-[#F8F9FB] border border-black/5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#1C1C1E]/60">
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Metadata */}
+                                    <div className="flex items-center gap-4 pt-6 border-t border-black/5">
+                                        <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${['UNDER_REVIEW', 'SUBMITTED', 'REVIEWED'].includes(selectedCompleted.status) ? 'bg-blue-50 text-blue-600' :
+                                            selectedCompleted.status === 'SHORTLISTED' ? 'bg-purple-50 text-purple-600' :
+                                                selectedCompleted.status === 'INTERVIEW' ? 'bg-cyan-50 text-cyan-600' :
+                                                    selectedCompleted.status === 'ACCEPTED' ? 'bg-green-50 text-green-700' :
+                                                        selectedCompleted.status === 'REJECTED' ? 'bg-red-50 text-red-600' :
+                                                            'bg-gray-50 text-gray-600'
+                                            }`}>
+                                            {['UNDER_REVIEW', 'SUBMITTED', 'REVIEWED'].includes(selectedCompleted.status) ? 'Under Review' :
+                                                selectedCompleted.status === 'SHORTLISTED' ? 'Shortlisted' :
+                                                    selectedCompleted.status === 'INTERVIEW' ? 'Interview' :
+                                                        selectedCompleted.status === 'ACCEPTED' ? 'Accepted' :
+                                                            selectedCompleted.status === 'REJECTED' ? 'Rejected' : selectedCompleted.status}
+                                        </span>
+                                        <span className="text-xs text-[#1C1C1E]/30">
+                                            Submitted {new Date(selectedCompleted.submittedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                        </span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </>
                     )}
-                </div>
+                </AnimatePresence>
 
                 {/* SLIDE-IN DETAIL PANEL */}
                 <AnimatePresence>

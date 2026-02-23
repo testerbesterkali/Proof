@@ -200,15 +200,31 @@ ${codeStr}
         if (!user || !challenge) return;
         setIsSubmitting(true);
         try {
-            // Get candidate profile
-            const { data: candidateProfile } = await supabase
+            // Get or create candidate profile
+            const { data: profiles } = await supabase
                 .from('CandidateProfile')
                 .select('id')
-                .eq('userId', user.id)
-                .single();
+                .eq('userId', user.id);
 
-            if (!candidateProfile?.id) {
-                throw new Error('Candidate profile not found');
+            let candidateId = profiles?.[0]?.id;
+
+            if (!candidateId) {
+                // Auto-create a candidate profile for this user
+                candidateId = crypto.randomUUID();
+                const { error: profileError } = await supabase
+                    .from('CandidateProfile')
+                    .insert({
+                        id: candidateId,
+                        userId: user.id,
+                        headline: '',
+                        onboardingCompleted: false,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    });
+                if (profileError) {
+                    console.error('Profile create error:', profileError);
+                    throw new Error('Could not create profile');
+                }
             }
 
             const submissionId = crypto.randomUUID();
@@ -217,10 +233,10 @@ ${codeStr}
                 .insert({
                     id: submissionId,
                     challengeId: challenge.id,
-                    candidateId: candidateProfile.id,
+                    candidateId: candidateId,
                     content: { code, language },
                     assetUrls: [],
-                    status: 'SUBMITTED',
+                    status: 'UNDER_REVIEW',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 });

@@ -41,8 +41,28 @@ export function Dashboard() {
                 .order('createdAt', { ascending: false });
 
             if (activeChallenges && activeChallenges.length > 0) {
+                // Filter out challenges the user has already submitted to
+                let completedChallengeIds = new Set<string>();
+                if (user) {
+                    // Get candidate profile
+                    const { data: profiles } = await supabase
+                        .from('CandidateProfile')
+                        .select('id')
+                        .eq('userId', user.id);
+                    const candidateId = profiles?.[0]?.id;
+                    if (candidateId) {
+                        const { data: userSubmissions } = await supabase
+                            .from('Submission')
+                            .select('challengeId')
+                            .eq('candidateId', candidateId);
+                        completedChallengeIds = new Set(userSubmissions?.map(s => s.challengeId) || []);
+                    }
+                }
+
+                const availableChallenges = activeChallenges.filter(c => !completedChallengeIds.has(c.id));
+
                 // Manually fetch Employer Profiles to ensure we get company names
-                const employerIds = [...new Set(activeChallenges.map(c => c.employerId))];
+                const employerIds = [...new Set(availableChallenges.map(c => c.employerId))];
                 const { data: employers } = await supabase
                     .from('EmployerProfile')
                     .select('id, companyName')
@@ -50,9 +70,9 @@ export function Dashboard() {
 
                 const employerMap = new Map(employers?.map(e => [e.id, e.companyName]) || []);
 
-                const formatted = activeChallenges.map(c => {
+                const formatted = availableChallenges.map(c => {
                     // Create a mock high match score since AI mapping isn't active yet
-                    const matchScore = Math.floor(Math.random() * 15) + 85;
+                    const matchScore = 85 + (c.id.charCodeAt(0) + c.id.charCodeAt(1)) % 15;
                     return {
                         id: c.id,
                         company: employerMap.get(c.employerId) || 'Classified',

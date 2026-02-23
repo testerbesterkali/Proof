@@ -1,112 +1,268 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     User,
     Star,
     MessageSquare,
     Check,
     X,
-    ChevronRight,
+    ChevronLeft,
     Award,
     TrendingUp,
     ShieldCheck,
-    Send
+    Send,
+    Loader2,
+    Code,
+    Terminal,
+    MapPin,
+    Briefcase,
+    ArrowUpRight,
+    Trophy
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+
+interface SubmissionData {
+    id: string;
+    challengeId: string;
+    candidateId: string;
+    content: {
+        code: string;
+        language: string;
+    };
+    status: string;
+    score: any;
+    createdAt: string;
+}
+
+interface CandidateData {
+    id: string;
+    headline: string;
+    location: string;
+    experience: string;
+    skills: string[];
+    name: string;
+}
+
+interface ChallengeData {
+    id: string;
+    title: string;
+    description: string;
+}
 
 export const SubmissionReview = () => {
     const { submissionId } = useParams();
     const navigate = useNavigate();
-    const [rating, setRating] = useState(4);
-    const [status, setStatus] = useState('UNDER_REVIEW');
-    const [rubricScores, setRubricScores] = useState({
-        codeQuality: 4,
-        performance: 5,
-        scalability: 3,
-        security: 4
-    });
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [submission, setSubmission] = useState<SubmissionData | null>(null);
+    const [candidate, setCandidate] = useState<CandidateData | null>(null);
+    const [challenge, setChallenge] = useState<ChallengeData | null>(null);
+    const [updating, setUpdating] = useState(false);
 
-    const candidate = {
-        name: "Alex River",
-        role: "Sr. Backend Engineer",
-        match: 94,
-        experience: "6 years",
-        location: "Remote, CA"
+    // UI State
+    const [activeTab, setActiveTab] = useState<'code' | 'specs'>('code');
+
+    useEffect(() => {
+        if (submissionId) loadData();
+    }, [submissionId]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            // 1. Fetch submission
+            const { data: sub, error: subError } = await supabase
+                .from('Submission')
+                .select('*')
+                .eq('id', submissionId)
+                .single();
+
+            if (subError) throw subError;
+            setSubmission(sub);
+
+            // 2. Fetch candidate info
+            const { data: prof, error: profError } = await supabase
+                .from('CandidateProfile')
+                .select('*')
+                .eq('id', sub.candidateId)
+                .single();
+
+            if (prof) {
+                setCandidate({
+                    id: prof.id,
+                    headline: prof.headline || 'Software Engineer',
+                    location: prof.location || 'Remote',
+                    experience: prof.experience || 'Not specified',
+                    skills: prof.skills || [],
+                    name: `Candidate #${prof.id.substring(0, 6)}` // Fallback name
+                });
+            }
+
+            // 3. Fetch challenge info
+            const { data: chal, error: chalError } = await supabase
+                .from('Challenge')
+                .select('*')
+                .eq('id', sub.challengeId)
+                .single();
+
+            if (chal) setChallenge(chal);
+
+        } catch (err) {
+            console.error('Failed to load submission review data:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const comments = [
-        { author: "Sarah (CTO)", content: "Very clean implementation of the Redis back-off logic.", time: "2h ago" },
-        { author: "Mike (Team Lead)", content: "I'm concerned about the JWT secret management here. Let's ask follow-up.", time: "45m ago" }
-    ];
+    const handleStatusUpdate = async (newStatus: string) => {
+        if (!submissionId) return;
+        setUpdating(true);
+        try {
+            const { error } = await supabase
+                .from('Submission')
+                .update({
+                    status: newStatus,
+                    updatedAt: new Date().toISOString()
+                })
+                .eq('id', submissionId);
 
-    const code = `// Alex River's Submission
-import redis from './utils/redis';
-import jwt from 'jsonwebtoken';
+            if (error) throw error;
 
-export class AuthService {
-  async revokeToken(token: string) {
-    const decoded = jwt.decode(token);
-    const expiry = decoded.exp - Math.floor(Date.now() / 1000);
-    await redis.setex(\`blacklist:\${token}\`, expiry, 'true');
-    console.log('Token revoked and blacklisted');
-  }
-}`;
+            // Update local state or navigate back
+            setSubmission(prev => prev ? { ...prev, status: newStatus } : null);
+
+            // If advanced, maybe we want to stay, but usually after decision we go back
+            // For now let's just update local state so they see the change
+        } catch (err) {
+            console.error('Failed to update status:', err);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-[#F8F9FB]">
+                <Loader2 className="w-8 h-8 animate-spin text-proof-accent" />
+            </div>
+        );
+    }
+
+    if (!submission || !candidate) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-[#F8F9FB]">
+                <h1 className="text-2xl font-bold mb-4">Submission Not Found</h1>
+                <button onClick={() => navigate('/employer/submissions')} className="bg-[#1C1C1E] text-white px-6 py-2 rounded-xl text-sm font-bold">
+                    Back to Submissions
+                </button>
+            </div>
+        );
+    }
+
+    const { code, language } = submission.content || { code: '', language: 'javascript' };
+    const aiScore = submission.score?.overall || 0;
 
     return (
-        <div className="flex flex-col h-screen bg-[#F4F5F6] text-[#1C1C1E] overflow-hidden">
+        <div className="flex flex-col h-screen bg-[#F8F9FB] text-[#1C1C1E] overflow-hidden">
             {/* Header */}
-            <header className="h-16 border-b border-black/5 px-8 flex items-center justify-between bg-white z-20">
+            <header className="h-20 border-b border-black/5 px-8 flex items-center justify-between bg-white/80 backdrop-blur-xl z-20">
                 <div className="flex items-center gap-6">
-                    <button onClick={() => navigate(-1)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
-                        <ChevronRight size={20} className="rotate-180" />
+                    <button onClick={() => navigate(-1)} className="p-3 hover:bg-black/5 rounded-2xl transition-all border border-transparent hover:border-black/5 group">
+                        <ChevronLeft size={20} className="text-[#1C1C1E]/40 group-hover:text-[#1C1C1E]" />
                     </button>
+                    <div className="h-10 w-px bg-black/5" />
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF9B8A] to-[#FF6B52] flex items-center justify-center text-white font-bold text-lg shadow-inner">
-                            {candidate.name.charAt(0)}
+                        <div className="w-12 h-12 rounded-2xl bg-[#1C1C1E] flex items-center justify-center text-white font-black text-xl shadow-lg border-b-4 border-black/20">
+                            {candidate.name.charAt(10)}
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-base font-black tracking-tight">{candidate.name}</h1>
-                                <div className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-black uppercase tracking-widest border border-green-500/20 flex items-center gap-1">
-                                    <ShieldCheck size={10} />
-                                    Top 1% Match
-                                </div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-xl font-black tracking-tight">{candidate.name}</h1>
+                                {aiScore >= 80 && (
+                                    <div className="px-3 py-1 rounded-full bg-proof-accent/10 text-proof-accent text-[10px] font-black uppercase tracking-widest border border-proof-accent/20 flex items-center gap-1.5 shadow-sm">
+                                        <ShieldCheck size={11} className="fill-proof-accent/20" />
+                                        High Fit
+                                    </div>
+                                )}
                             </div>
-                            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest mt-0.5">{candidate.role} • {candidate.location}</p>
+                            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                                <span className="text-black/20 group-hover:text-proof-accent transition-colors">●</span> {candidate.headline}
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button className="px-5 py-2 rounded-full border border-black/10 text-[11px] font-black uppercase tracking-widest hover:bg-black/5 transition-colors">
-                        Save to Pool
+                    <button
+                        disabled={updating || submission.status === 'REJECTED'}
+                        onClick={() => handleStatusUpdate('REJECTED')}
+                        className={`px-6 py-3 rounded-2xl border border-red-200 text-red-500 text-[11px] font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-30 ${submission.status === 'REJECTED' ? 'bg-red-50' : ''}`}
+                    >
+                        {submission.status === 'REJECTED' ? <X size={14} strokeWidth={3} /> : <X size={14} strokeWidth={2.5} />}
+                        {submission.status === 'REJECTED' ? 'Rejected' : 'Reject'}
                     </button>
-                    <button className="px-5 py-2 rounded-full bg-red-500/10 text-red-600 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-colors flex items-center gap-2">
-                        <X size={14} />
-                        Reject
+                    <button
+                        disabled={updating || submission.status === 'ACCEPTED' || submission.status === 'INTERVIEW'}
+                        onClick={() => handleStatusUpdate('INTERVIEW')}
+                        className={`px-6 py-3 rounded-2xl bg-[#1C1C1E] text-white text-[11px] font-black uppercase tracking-widest hover:translate-y-[-2px] hover:shadow-xl hover:shadow-[#1C1C1E]/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:translate-y-0`}
+                    >
+                        {updating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
+                        {submission.status === 'ACCEPTED' || submission.status === 'INTERVIEW' ? 'Shortlisted' : 'Advance to Interview'}
                     </button>
-                    <button className="px-5 py-2 rounded-full bg-[#1C1C1E] text-white text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-black/10 flex items-center gap-2">
-                        <Check size={14} />
-                        Advance to Interview
-                    </button>
+                    <div className="h-10 w-px bg-black/5 mx-2" />
+                    <div className="flex items-center gap-4">
+                        <div className="text-right">
+                            <p className="text-[10px] font-bold text-black/30 uppercase tracking-[0.2em] mb-0.5">AI Match</p>
+                            <p className={`text-2xl font-black ${aiScore >= 80 ? 'text-green-500' : aiScore >= 60 ? 'text-amber-500' : 'text-red-500'}`}>
+                                {aiScore}%
+                            </p>
+                        </div>
+                        <div className="w-12 h-12 rounded-2xl bg-white shadow-soft border border-black/5 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full border-4 border-proof-accent border-t-transparent animate-spin opacity-20" />
+                            <Trophy className={`absolute w-5 h-5 ${aiScore >= 80 ? 'text-amber-400 fill-amber-400' : 'text-black/10'}`} />
+                        </div>
+                    </div>
                 </div>
             </header>
 
             {/* Main Content */}
             <main className="flex-1 flex overflow-hidden">
+                {/* Left side nav tabs */}
+                <aside className="w-20 bg-white border-r border-black/5 flex flex-col items-center py-8 gap-4 shadow-sm z-10">
+                    <button
+                        onClick={() => setActiveTab('code')}
+                        className={`p-4 rounded-2xl transition-all ${activeTab === 'code' ? 'bg-[#1C1C1E] text-white shadow-lg' : 'text-[#1C1C1E]/30 hover:bg-black/5 hover:text-[#1C1C1E]'}`}
+                    >
+                        <Code size={24} />
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('specs')}
+                        className={`p-4 rounded-2xl transition-all ${activeTab === 'specs' ? 'bg-[#1C1C1E] text-white shadow-lg' : 'text-[#1C1C1E]/30 hover:bg-black/5 hover:text-[#1C1C1E]'}`}
+                    >
+                        <Terminal size={24} />
+                    </button>
+                </aside>
+
                 {/* Left: Code Viewer */}
-                <div className="flex-1 flex flex-col bg-white border-r border-black/5 shadow-sm">
-                    <div className="h-12 px-6 flex items-center justify-between border-b border-black/5">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">Work Sample: auth_service.ts</span>
-                        <div className="flex items-center gap-2 px-2 py-1 rounded bg-black/5 text-[10px] font-bold text-black/60">
-                            TypeScript
+                <div className="flex-1 flex flex-col bg-white">
+                    <div className="h-12 px-6 flex items-center justify-between border-b border-black/5 bg-[#F8F9FB]/50">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-black/40">Proof of Work</span>
+                            <div className="h-3 w-px bg-black/10" />
+                            <span className="text-[10px] font-bold text-proof-accent uppercase tracking-widest">
+                                {challenge?.title || 'Coding Challenge'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#1C1C1E]/5 text-[9px] font-black text-[#1C1C1E]/60 uppercase tracking-widest">
+                            {language}
                         </div>
                     </div>
                     <div className="flex-1">
                         <Editor
                             height="100%"
-                            language="typescript"
+                            language={language}
                             value={code}
                             options={{
                                 readOnly: true,
@@ -115,87 +271,119 @@ export class AuthService {
                                 scrollBeyondLastLine: false,
                                 fontFamily: "'JetBrains Mono', monospace",
                                 padding: { top: 20 },
-                                theme: 'vs-light'
+                                theme: 'vs-light',
+                                lineNumbers: 'on',
+                                folding: true,
+                                scrollbar: {
+                                    vertical: 'hidden',
+                                    horizontal: 'hidden'
+                                }
                             }}
                         />
                     </div>
                 </div>
 
-                {/* Middle: Rubric scoring */}
-                <div className="w-[380px] flex flex-col bg-[#F4F5F6] border-r border-black/5">
-                    <div className="p-8 space-y-8 overflow-y-auto">
-                        <section className="space-y-4">
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-black/40 border-b border-black/5 pb-2">Scoring Rubric</h3>
+                {/* Right: Insights & Rubric */}
+                <div className="w-[450px] flex flex-col bg-[#F8F9FB] border-l border-black/5 overflow-y-auto">
+                    <div className="p-10 space-y-10">
+                        <section className="space-y-6">
+                            <div className="flex items-center justify-between border-b border-black/5 pb-4">
+                                <h3 className="text-[11px] font-black uppercase tracking-widest text-black/30">AI Evaluation</h3>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                    <span className="text-[9px] font-black tracking-widest text-[#1C1C1E]/40 uppercase">Verified Solution</span>
+                                </div>
+                            </div>
 
-                            {Object.entries(rubricScores).map(([key, value]) => (
-                                <div key={key} className="space-y-3 p-4 rounded-2xl bg-white shadow-sm border border-black/[0.02]">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                                        <span className="text-xs font-black text-[#FF6B52]">{value}/5</span>
+                            <div className="bg-[#1C1C1E] rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-proof-accent/20 blur-[60px] group-hover:bg-proof-accent/30 transition-all" />
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
+                                        <Award className="text-proof-accent" size={18} />
                                     </div>
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="5"
-                                        value={value}
-                                        onChange={(e) => setRubricScores({ ...rubricScores, [key]: parseInt(e.target.value) })}
-                                        className="w-full accent-[#FF6B52]"
-                                    />
-                                    <p className="text-[10px] text-black/40 italic">Evaluates how the candidate handled concurrency and data integrity.</p>
+                                    <h4 className="text-base font-black tracking-tight">Executive Summary</h4>
                                 </div>
-                            ))}
+                                <p className="text-xs text-white/70 leading-relaxed italic mb-8">
+                                    "{submission.score?.summary || 'No AI summary available for this submission yet.'}"
+                                </p>
+                                <div className="flex gap-2">
+                                    <div className="px-3 py-1.5 rounded-lg bg-white/10 text-[9px] font-black uppercase tracking-widest text-white/60">
+                                        Idiomatic
+                                    </div>
+                                    <div className="px-3 py-1.5 rounded-lg bg-white/10 text-[9px] font-black uppercase tracking-widest text-white/60">
+                                        Performant
+                                    </div>
+                                </div>
+                            </div>
                         </section>
 
-                        <section className="p-6 rounded-2xl bg-gradient-to-br from-[#1C1C1E] to-[#2D2D2F] text-white shadow-2xl">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Award className="text-[#FF9B8A]" size={20} />
-                                <h4 className="text-sm font-black tracking-tight">AI Summary</h4>
-                            </div>
-                            <p className="text-[11px] text-white/70 leading-relaxed italic">
-                                "Candidate Alex demonstated advanced knowledge of edge caching strategies. The code is highly idiomatic and passes 9/10 test cases for concurrency."
-                            </p>
-                            <div className="mt-4 flex items-center justify-between pt-4 border-t border-white/10">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">AI Confidence</span>
-                                <span className="text-xs font-bold text-green-400">92%</span>
+                        <section className="space-y-6">
+                            <h3 className="text-[11px] font-black uppercase tracking-widest text-black/30 border-b border-black/5 pb-4">Skill Assessment</h3>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {submission.score && Object.entries(submission.score).map(([key, value]: [string, any]) => {
+                                    if (typeof value !== 'number' || key === 'overall') return null;
+                                    return (
+                                        <div key={key} className="bg-white/60 border border-white rounded-[1.5rem] p-6 shadow-soft flex flex-col gap-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${value >= 80 ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                        {key === 'codeQuality' ? '💎' : key === 'efficiency' ? '⚡' : key === 'bestPractices' ? '🛡️' : '✓'}
+                                                    </div>
+                                                    <span className="text-xs font-black capitalize tracking-tight">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                                </div>
+                                                <span className={`text-sm font-black ${value >= 80 ? 'text-green-600' : 'text-amber-600'}`}>{value}%</span>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-[#F8F9FB] rounded-full overflow-hidden border border-black/[0.02]">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${value}%` }}
+                                                    transition={{ duration: 1, type: "spring" }}
+                                                    className={`h-full rounded-full ${value >= 80 ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]'}`}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </section>
-                    </div>
-                </div>
 
-                {/* Right: Team Discussion */}
-                <div className="w-[320px] flex flex-col bg-white">
-                    <div className="h-12 px-6 flex items-center border-b border-black/5">
-                        <MessageSquare size={14} className="mr-2 text-black/40" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">Team Discussion</span>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                        {comments.map((comment, i) => (
-                            <div key={i} className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-black/80">{comment.author}</span>
-                                    <span className="text-[9px] text-black/30">{comment.time}</span>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-black/5 text-[11px] leading-relaxed text-black/70">
-                                    {comment.content}
+                        <section className="space-y-6 pb-12">
+                            <h3 className="text-[11px] font-black uppercase tracking-widest text-black/30 border-b border-black/5 pb-4">Candidate Context</h3>
+                            <div className="bg-white/60 border border-white rounded-[2rem] p-8 shadow-soft">
+                                <div className="flex flex-col gap-6">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-[#F8F9FB] flex items-center justify-center text-[#1C1C1E]/40">
+                                            <MapPin size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-black/30 uppercase tracking-widest">Location</p>
+                                            <p className="text-sm font-bold">{candidate.location}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-[#F8F9FB] flex items-center justify-center text-[#1C1C1E]/40">
+                                            <Briefcase size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-black/30 uppercase tracking-widest">Experience</p>
+                                            <p className="text-sm font-bold">{candidate.experience}</p>
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 flex flex-wrap gap-2 border-t border-black/5">
+                                        {candidate.skills.slice(0, 6).map(skill => (
+                                            <span key={skill} className="px-3 py-1.5 rounded-lg bg-black/5 text-[10px] font-bold text-black/40 uppercase tracking-tight">
+                                                {skill}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-
-                    <div className="p-6 border-t border-black/5 bg-[#F4F5F6]">
-                        <div className="relative">
-                            <textarea
-                                placeholder="Add internal note..."
-                                className="w-full bg-white border border-black/5 rounded-2xl p-4 text-[11px] outline-none shadow-sm h-24 resize-none focus:border-[#FF6B52] transition-colors"
-                            />
-                            <button className="absolute bottom-3 right-3 p-1.5 rounded-full bg-[#1C1C1E] text-white hover:bg-black transition-colors">
-                                <Send size={12} />
-                            </button>
-                        </div>
+                        </section>
                     </div>
                 </div>
             </main>
         </div>
     );
 };
+
